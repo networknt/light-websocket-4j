@@ -1,0 +1,19 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "required" : [ "enabled", "pathPrefixHandlers" ],
+  "properties" : {
+    "enabled" : {
+      "type" : "boolean",
+      "description" : "Enable WebSocket Handler",
+      "default" : true
+    },
+    "pathPrefixHandlers" : {
+      "type" : "object",
+      "description" : "Map of path prefix to handler class names (must implement WebSocketApplicationHandler).",
+      "additionalProperties" : {
+        "type" : "string"
+      }
+    }
+  }
+}

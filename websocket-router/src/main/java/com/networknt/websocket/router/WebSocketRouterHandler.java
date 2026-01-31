@@ -1,13 +1,22 @@
 package com.networknt.websocket.router;
 
 import com.networknt.cluster.Cluster;
+import com.networknt.config.Config;
+import com.networknt.handler.Handler;
+import com.networknt.handler.MiddlewareHandler;
 import com.networknt.router.RouterConfig;
+import com.networknt.server.ModuleRegistry;
 import com.networknt.service.SingletonServiceFactory;
 import com.networknt.websocket.client.WsAttributes;
 import com.networknt.websocket.client.WsProxyClientPair;
+import io.undertow.Handlers;
 import io.undertow.client.ProxiedRequestAttachments;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
+import io.undertow.util.PathMatcher;
 import io.undertow.websockets.WebSocketConnectionCallback;
+import io.undertow.websockets.WebSocketProtocolHandshakeHandler;
 import io.undertow.websockets.client.WebSocketClient;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
@@ -21,12 +30,72 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class WebSocketRouterHandler implements WebSocketConnectionCallback {
+public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConnectionCallback {
     private static final Logger LOG = LoggerFactory.getLogger(WebSocketRouterHandler.class);
     private static final Cluster CLUSTER = SingletonServiceFactory.getBean(Cluster.class);
     private static final RouterConfig CONFIG = RouterConfig.load();
+    private static final WebSocketRouterConfig WS_CONFIG = WebSocketRouterConfig.load();
     private static final Map<String, WsProxyClientPair> CHANNELS = new ConcurrentHashMap<>();
+    private static final PathMatcher<String> pathMatcher = new PathMatcher<>();
 
+    private volatile HttpHandler next;
+
+    static {
+        if (WS_CONFIG.getPathPrefixService() != null) {
+            for (Map.Entry<String, String> entry : WS_CONFIG.getPathPrefixService().entrySet()) {
+                pathMatcher.addPrefixPath(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    public WebSocketRouterHandler() {
+        // Initialize config or logger if needed
+    }
+
+    @Override
+    public void handleRequest(HttpServerExchange exchange) throws Exception {
+        // Determine if this request is targeted for the WebSocket router
+        boolean isWsRequest = false;
+        
+        // Check for service_id header
+        if (exchange.getRequestHeaders().contains("service_id")) {
+            isWsRequest = true;
+        } else {
+            // Check path mapping
+            String path = exchange.getRequestPath();
+             PathMatcher.PathMatch<String> match = pathMatcher.match(path);
+             if (match.getValue() != null) {
+                 isWsRequest = true;
+             }
+        }
+
+        if (isWsRequest) {
+            // Delegate to Undertow's WebSocketProtocolHandshakeHandler
+            // which handles the upgrade and calls our onConnect callback
+            new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+        } else {
+            // Not a websocket request for us, pass to next handler
+            Handler.next(exchange, next);
+        }
+    }
+
+    @Override
+    public HttpHandler getNext() {
+        return next;
+    }
+
+    @Override
+    public MiddlewareHandler setNext(HttpHandler next) {
+        Handlers.handlerNotNull(next);
+        this.next = next;
+        return this;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return WS_CONFIG.isEnabled();
+    }
+    
     @Override
     public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
 
@@ -37,7 +106,19 @@ public class WebSocketRouterHandler implements WebSocketConnectionCallback {
             protocol = WsAttributes.WEBSOCKET_PROTOCOL;
         }
 
-        final var serviceId = exchange.getRequestHeader("service_id");
+        String serviceId = exchange.getRequestHeader("service_id");
+        if(serviceId == null) {
+            String requestURI = exchange.getRequestURI();
+            String path = requestURI;
+            int questionMarkIndex = requestURI.indexOf('?');
+            if (questionMarkIndex != -1) {
+                path = requestURI.substring(0, questionMarkIndex);
+            }
+            PathMatcher.PathMatch<String> match = pathMatcher.match(path);
+            if (match.getValue() != null) {
+                serviceId = match.getValue();
+            }
+        }
         if (serviceId != null) {
             final var downstreamUrl = CLUSTER.serviceToUrl(protocol, serviceId, null, null);
             if (downstreamUrl != null) {

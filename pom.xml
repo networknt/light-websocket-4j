@@ -113,6 +113,7 @@
         <module>websocket-transmission-echo</module>
         <module>websocket-router</module>
         <module>websocket-session</module>
+        <module>websocket-handler</module>
     </modules>
 
     <dependencyManagement>
@@ -141,6 +142,11 @@
             <dependency>
                 <groupId>com.networknt</groupId>
                 <artifactId>websocket-session</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>websocket-handler</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -400,6 +406,9 @@
     </reporting>
 
     <profiles>
+        <profile>
+            <id>schema-generation</id>
+        </profile>
         <profile>
             <id>release-sign-artifacts</id>
             <activation>

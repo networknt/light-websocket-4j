@@ -1,0 +1,5 @@
+# Light websocket handler configuration
+# Enable WebSocket Handler
+enabled: ${websocket-handler.enabled:true}
+# Map of path prefix to handler class names (must implement WebSocketApplicationHandler).
+pathPrefixHandlers: ${websocket-handler.pathPrefixHandlers:}

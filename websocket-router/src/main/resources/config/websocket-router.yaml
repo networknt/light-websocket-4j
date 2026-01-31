@@ -1,0 +1,3 @@
+# Light websocket router configuration
+# Map of path prefix to serviceId for routing purposes when service_id header is missing.
+pathPrefixService: ${websocket-router.pathPrefixService:}
