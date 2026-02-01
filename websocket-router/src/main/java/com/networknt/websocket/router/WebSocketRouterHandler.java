@@ -120,7 +120,11 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         if (serviceId != null) {
             final var downstreamUrl = CLUSTER.serviceToUrl(protocol, serviceId, null, null);
             if (downstreamUrl != null) {
-                final var channelId = exchange.getRequestHeader(WsAttributes.CHANNEL_GROUP_ID);
+                String channelId = exchange.getRequestHeader(WsAttributes.CHANNEL_GROUP_ID);
+                if (channelId == null) {
+                    channelId = java.util.UUID.randomUUID().toString();
+                }
+                if(logger.isTraceEnabled()) logger.trace("channelId = {}", channelId);
                 if (channelId != null) {
                     channel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
                     channel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.CLIENT_TO_PROXY);
@@ -168,12 +172,12 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
 
                                 } catch (NumberFormatException e) {
                                     port = String.valueOf(channel.getDestinationAddress().getPort());
-                                    exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
+                                    // exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
                                     exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
                                 }
                             } else {
                                 port = String.valueOf(channel.getDestinationAddress().getPort());
-                                exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
+                                // exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
                                 exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
                             }
 
