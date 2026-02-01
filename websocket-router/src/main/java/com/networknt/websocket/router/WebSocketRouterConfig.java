@@ -29,14 +29,6 @@ public class WebSocketRouterConfig {
     public static final String CONFIG_NAME = "websocket-router";
     private static final String PATH_PREFIX_SERVICE = "pathPrefixService";
 
-    @MapField(
-            configFieldName = PATH_PREFIX_SERVICE,
-            externalizedKeyName = PATH_PREFIX_SERVICE,
-            description = "Map of path prefix to serviceId for routing purposes when service_id header is missing.",
-            valueType = String.class
-    )
-    Map<String, String> pathPrefixService;
-
     @BooleanField(
             configFieldName = "enabled",
             externalizedKeyName = "enabled",
@@ -45,7 +37,15 @@ public class WebSocketRouterConfig {
     )
     boolean enabled;
 
-    private Map<String, Object> mappedConfig;
+    @MapField(
+            configFieldName = PATH_PREFIX_SERVICE,
+            externalizedKeyName = PATH_PREFIX_SERVICE,
+            description = "Map of path prefix to serviceId for routing purposes when service_id header is missing.",
+            valueType = String.class
+    )
+    Map<String, String> pathPrefixService;
+
+    private final Map<String, Object> mappedConfig;
     private static volatile WebSocketRouterConfig instance;
 
     private WebSocketRouterConfig() {
@@ -105,7 +105,7 @@ public class WebSocketRouterConfig {
             } else if (mappedConfig.get(PATH_PREFIX_SERVICE) instanceof String) {
                 String s = (String)mappedConfig.get(PATH_PREFIX_SERVICE);
                 s = s.trim();
-                if(logger.isTraceEnabled()) logger.trace("s = " + s);
+                if(logger.isTraceEnabled()) logger.trace("s = {}", s);
                 if(s.startsWith("{")) {
                     // json map
                     try {

@@ -1,3 +1,5 @@
 # Light websocket router configuration
+# Enable WebSocket Router Handler
+enabled: ${websocket-router.enabled:true}
 # Map of path prefix to serviceId for routing purposes when service_id header is missing.
 pathPrefixService: ${websocket-router.pathPrefixService:}

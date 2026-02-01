@@ -1,11 +1,9 @@
 package com.networknt.websocket.router;
 
 import com.networknt.cluster.Cluster;
-import com.networknt.config.Config;
 import com.networknt.handler.Handler;
 import com.networknt.handler.MiddlewareHandler;
 import com.networknt.router.RouterConfig;
-import com.networknt.server.ModuleRegistry;
 import com.networknt.service.SingletonServiceFactory;
 import com.networknt.websocket.client.WsAttributes;
 import com.networknt.websocket.client.WsProxyClientPair;

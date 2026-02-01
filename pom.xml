@@ -121,11 +121,6 @@
             <!-- Modules in this project -->
             <dependency>
                 <groupId>com.networknt</groupId>
-                <artifactId>websocket-proxy</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.networknt</groupId>
                 <artifactId>websocket-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
