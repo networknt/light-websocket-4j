@@ -1,0 +1,17 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "required" : [ "enabled", "backendPath" ],
+  "properties" : {
+    "enabled" : {
+      "type" : "boolean",
+      "description" : "Enable WebSocket Rendezvous Handler",
+      "default" : true
+    },
+    "backendPath" : {
+      "type" : "string",
+      "description" : "The path identifier for backend connections in the rendezvous handler.",
+      "default" : "/connect"
+    }
+  }
+}

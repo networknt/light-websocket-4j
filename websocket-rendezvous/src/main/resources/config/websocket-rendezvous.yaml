@@ -1,0 +1,5 @@
+# Light websocket rendezvous configuration
+# Enable WebSocket Rendezvous Handler
+enabled: ${websocket-rendezvous.enabled:true}
+# The path identifier for backend connections in the rendezvous handler.
+backendPath: ${websocket-rendezvous.backendPath:/connect}

@@ -1,5 +1,6 @@
 package com.networknt.websocket.rendezvous;
 
+import com.networknt.handler.Handler;
 import com.networknt.handler.MiddlewareHandler;
 import com.networknt.websocket.client.WsAttributes;
 import com.networknt.websocket.client.WsProxyClientPair;
@@ -39,7 +40,7 @@ public class WebSocketRendezvousHandler implements MiddlewareHandler, WebSocketC
             // In MiddlewareHandler pattern, "isEnabled" controls if it's executed in the chain.
             // But if we are called, we should check it.
             // Delegate to next.
-            com.networknt.handler.Handler.next(exchange, next);
+            Handler.next(exchange, next);
         }
     }
 
