@@ -19,7 +19,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.networknt</groupId>
     <artifactId>light-websocket-4j</artifactId>
-    <version>2.3.2-SNAPSHOT</version>
+    <version>2.3.2</version>
     <packaging>pom</packaging>
     <name>Parent POM</name>
     <description>Light 4J Framework WebSocket Components</description>
@@ -97,7 +97,7 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <version.light-4j>2.3.2-SNAPSHOT</version.light-4j>
+        <version.light-4j>2.3.2</version.light-4j>
         <version.slf4j>2.0.17</version.slf4j>
         <version.commons-text>1.15.0</version.commons-text>
         <version.logback>1.5.26</version.logback>
