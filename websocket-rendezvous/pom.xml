@@ -12,6 +12,7 @@
 
     <artifactId>websocket-rendezvous</artifactId>
     <packaging>jar</packaging>
+    <name>websocket-rendezvous</name>
     <description>A WebSocket handler for Rendezvous pattern</description>
 
     <dependencies>

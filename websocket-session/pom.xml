@@ -12,6 +12,7 @@
 
     <artifactId>websocket-session</artifactId>
     <packaging>jar</packaging>
+    <name>websocket-session</name>
     <description>websocket session</description>
 
     <dependencies>

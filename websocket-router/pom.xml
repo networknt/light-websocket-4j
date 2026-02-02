@@ -12,7 +12,8 @@
 
     <artifactId>websocket-router</artifactId>
     <packaging>jar</packaging>
-    <description>websocket router</description>
+    <name>websocket-router</name>
+    <description>websocket router to proxy route websocket traffic to another websocket server</description>
 
     <dependencies>
         <dependency>

@@ -12,7 +12,8 @@
 
     <artifactId>websocket-handler</artifactId>
     <packaging>jar</packaging>
-    <description>websocket handler</description>
+    <name>websocket-handler</name>
+    <description>websocket handler to invoke LLM model</description>
 
     <dependencies>
         <dependency>

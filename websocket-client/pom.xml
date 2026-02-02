@@ -11,6 +11,9 @@
     </parent>
 
     <artifactId>websocket-client</artifactId>
+    <packaging>jar</packaging>
+    <name>websocket-client</name>
+    <description>A module for websocket client.</description>
 
     <dependencies>
         <dependency>

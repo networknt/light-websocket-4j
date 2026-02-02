@@ -10,6 +10,9 @@
     </parent>
 
     <artifactId>websocket-transmission-echo</artifactId>
+    <packaging>jar</packaging>
+    <name>websocket-transmission-echo</name>
+    <description>websocket transmission echo</description>
 
     <dependencies>
         <dependency>
