@@ -114,6 +114,7 @@
         <module>websocket-router</module>
         <module>websocket-session</module>
         <module>websocket-handler</module>
+        <module>websocket-rendezvous</module>
     </modules>
 
     <dependencyManagement>
@@ -142,6 +143,11 @@
             <dependency>
                 <groupId>com.networknt</groupId>
                 <artifactId>websocket-handler</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>websocket-rendezvous</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

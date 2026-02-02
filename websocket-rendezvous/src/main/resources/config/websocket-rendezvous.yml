@@ -1,0 +1,3 @@
+# websocket-rendezvous.yml
+enabled: true
+backendPath: /connect

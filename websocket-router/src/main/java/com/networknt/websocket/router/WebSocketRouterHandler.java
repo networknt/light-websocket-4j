@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -96,7 +95,6 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     
     @Override
     public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
-
         String protocol = null;
         if (exchange.getRequestURI().startsWith(WsAttributes.WEBSOCKET_SECURE_PROTOCOL)) {
             protocol = WsAttributes.WEBSOCKET_SECURE_PROTOCOL;
@@ -117,6 +115,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                 serviceId = match.getValue();
             }
         }
+        
         if (serviceId != null) {
             final var downstreamUrl = CLUSTER.serviceToUrl(protocol, serviceId, null, null);
             if (downstreamUrl != null) {
@@ -124,14 +123,16 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                 if (channelId == null) {
                     channelId = java.util.UUID.randomUUID().toString();
                 }
-                if(logger.isTraceEnabled()) logger.trace("channelId = {}", channelId);
+                
+                if(LOG.isTraceEnabled()) LOG.trace("channelId = {}", channelId);
+                
                 if (channelId != null) {
                     channel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
                     channel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.CLIENT_TO_PROXY);
                     channel.getReceiveSetter().set(new WebSocketSessionProxyReceiveListener(CHANNELS));
+                    
                     if (!CHANNELS.containsKey(channelId)) {
                         try {
-
                             final var targetUri = downstreamUrl + exchange.getRequestURI();
                             final var address = channel.getSourceAddress();
                             final String remoteHost;
@@ -172,16 +173,12 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
 
                                 } catch (NumberFormatException e) {
                                     port = String.valueOf(channel.getDestinationAddress().getPort());
-                                    // exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
                                     exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
                                 }
                             } else {
                                 port = String.valueOf(channel.getDestinationAddress().getPort());
-                                // exchange.getRequestHeaders().put(Headers.X_FORWARDED_PORT_STRING, Collections.singletonList(port));
                                 exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
                             }
-
-                            // TODO - attach SSL info?
 
                             /* create new connection to downstream */
                             final var webSocketConnection = new WebSocketClient.ConnectionBuilder(
@@ -197,7 +194,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                             CHANNELS.put(channelId, new WsProxyClientPair(channel, outChannel));
                             outChannel.resumeReceives();
                         } catch (URISyntaxException | IOException e) {
-                            LOG.error("Failed to create connection to the backend.");
+                            LOG.error("Failed to create connection to the backend.", e);
                             try {
                                 channel.sendClose();
                             } catch (IOException ex) {
@@ -208,8 +205,14 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                     }
                     channel.resumeReceives();
                 }
+            } else {
+                LOG.error("Could not find downstream URL for serviceId: {}", serviceId);
+                try {
+                    channel.sendClose();
+                } catch (IOException e) {
+                    LOG.error("Failed to close channel", e);
+                }
             }
         }
     }
-
 }

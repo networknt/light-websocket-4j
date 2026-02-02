@@ -7,15 +7,30 @@ public class WsProxyClientPair {
         CLIENT_TO_PROXY,
         PROXY_TO_DOWNSTREAM
     }
-    private final WsClient clientToProxyClient;
-    private final WsClient proxyToDestinationClient;
+    private WsClient clientToProxyClient;
+    private WsClient proxyToDestinationClient;
+
     public WsProxyClientPair(final WsClient clientToProxyClient, final WsClient proxyToDestinationClient) {
         this.clientToProxyClient = clientToProxyClient;
         this.proxyToDestinationClient = proxyToDestinationClient;
     }
 
     public WsProxyClientPair(final WebSocketChannel clientToProxyChannel, final WebSocketChannel proxyToDestinationChannel) {
-        this(new WsClient(clientToProxyChannel), new WsClient(proxyToDestinationChannel));
+        this(clientToProxyChannel != null ? new WsClient(clientToProxyChannel) : null, 
+             proxyToDestinationChannel != null ? new WsClient(proxyToDestinationChannel) : null);
+    }
+
+    // Constructor for waiting/rendezvous mode
+    public WsProxyClientPair(final WebSocketChannel clientToProxyChannel) {
+        this.clientToProxyClient = new WsClient(clientToProxyChannel);
+    }
+
+    public void setProxyToDestinationClient(final WebSocketChannel proxyToDestinationChannel) {
+        this.proxyToDestinationClient = new WsClient(proxyToDestinationChannel);
+    }
+    
+    public void setClientToProxyClient(final WebSocketChannel clientToProxyChannel) {
+        this.clientToProxyClient = new WsClient(clientToProxyChannel);
     }
 
     public WsClient getClientForChannel(final WebSocketChannel channel) {
@@ -36,7 +51,7 @@ public class WsProxyClientPair {
     }
 
     public void safeClosePairs() {
-        this.clientToProxyClient.safeCloseChannel();
-        this.proxyToDestinationClient.safeCloseChannel();
+        if(this.clientToProxyClient != null) this.clientToProxyClient.safeCloseChannel();
+        if(this.proxyToDestinationClient != null) this.proxyToDestinationClient.safeCloseChannel();
     }
 }
