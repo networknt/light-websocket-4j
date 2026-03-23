@@ -95,12 +95,22 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     
     @Override
     public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
-        String protocol = null;
-        if (exchange.getRequestURI().startsWith(WsAttributes.WEBSOCKET_SECURE_PROTOCOL)) {
+        // Detect protocol from URI if it's absolute, otherwise use a safe default or check context.
+        // The previous startsWith check was always false for relative paths like /chat.
+        // Detect protocol from outgoing request URI if absolute, otherwise use a safe default or check X-Forwarded-Proto
+        String protocol = WsAttributes.WEBSOCKET_PROTOCOL;
+        String xForwardedProto = exchange.getRequestHeader("X-Forwarded-Proto");
+        if ("https".equalsIgnoreCase(xForwardedProto)) {
             protocol = WsAttributes.WEBSOCKET_SECURE_PROTOCOL;
         } else {
-            protocol = WsAttributes.WEBSOCKET_PROTOCOL;
+            // Check if the current exchange URI is absolute and starts with wss
+            String requestURI = exchange.getRequestURI();
+            if (requestURI != null && requestURI.startsWith(WsAttributes.WEBSOCKET_SECURE_PROTOCOL)) {
+                protocol = WsAttributes.WEBSOCKET_SECURE_PROTOCOL;
+            }
         }
+
+        if (LOG.isTraceEnabled()) LOG.trace("Detected protocol: {} from request URI: {}", protocol, exchange.getRequestURI());
 
         String serviceId = exchange.getRequestHeader("service_id");
         if(serviceId == null) {
