@@ -15,8 +15,12 @@ import io.undertow.util.Headers;
 import io.undertow.util.PathMatcher;
 import io.undertow.websockets.WebSocketConnectionCallback;
 import io.undertow.websockets.WebSocketProtocolHandshakeHandler;
-import io.undertow.websockets.client.WebSocketClient;
+import io.undertow.websockets.client.WebSocketClientNegotiation;
 import io.undertow.websockets.core.WebSocketChannel;
+import io.undertow.websockets.core.protocol.Handshake;
+import io.undertow.websockets.core.protocol.version07.Hybi07Handshake;
+import io.undertow.websockets.core.protocol.version08.Hybi08Handshake;
+import io.undertow.websockets.core.protocol.version13.Hybi13Handshake;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +28,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConnectionCallback {
@@ -69,7 +79,31 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         if (isWsRequest) {
             // Delegate to Undertow's WebSocketProtocolHandshakeHandler
             // which handles the upgrade and calls our onConnect callback
-            new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+            Collection<String> protocolHeaders = exchange.getRequestHeaders().get("Sec-WebSocket-Protocol");
+            if (protocolHeaders != null && !protocolHeaders.isEmpty()) {
+                Set<String> subprotocols = new LinkedHashSet<>();
+                for (String headerValue : protocolHeaders) {
+                    if (headerValue != null) {
+                        for (String token : headerValue.split(",")) {
+                            String trimmed = token.trim();
+                            if (!trimmed.isEmpty()) {
+                                subprotocols.add(trimmed);
+                            }
+                        }
+                    }
+                }
+                if (!subprotocols.isEmpty()) {
+                    Collection<Handshake> handshakes = new ArrayList<>();
+                    handshakes.add(new Hybi13Handshake(subprotocols, true));
+                    handshakes.add(new Hybi08Handshake(subprotocols, true));
+                    handshakes.add(new Hybi07Handshake(subprotocols, true));
+                    new WebSocketProtocolHandshakeHandler(handshakes, this).handleRequest(exchange);
+                } else {
+                    new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+                }
+            } else {
+                new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+            }
         } else {
             // Not a websocket request for us, pass to next handler
             Handler.next(exchange, next);
@@ -191,13 +225,31 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                             }
 
                             /* create new connection to downstream */
-                            final var webSocketConnection = new WebSocketClient.ConnectionBuilder(
+                            String subprotocolHeader = exchange.getRequestHeader("Sec-WebSocket-Protocol");
+                            final List<String> subprotocols = new ArrayList<>();
+                            if (subprotocolHeader != null) {
+                                for (String token : subprotocolHeader.split(",")) {
+                                    String trimmed = token.trim();
+                                    if (!trimmed.isEmpty()) {
+                                        subprotocols.add(trimmed);
+                                    }
+                                }
+                            }
+                            WebSocketClientNegotiation negotiation = new WebSocketClientNegotiation(subprotocols, Collections.emptyList()) {
+                                @Override
+                                public void beforeRequest(Map<String, List<String>> headers) {
+                                    if (!subprotocols.isEmpty()) {
+                                        headers.put("Sec-WebSocket-Protocol", Collections.singletonList(String.join(", ", subprotocols)));
+                                    }
+                                }
+                            };
+
+                            final var webSocketConnection = new io.undertow.websockets.client.WebSocketClient.ConnectionBuilder(
                                     channel.getWorker(),
                                     channel.getBufferPool(),
                                     new URI(targetUri)
-                            );
+                            ).setClientNegotiation(negotiation);
                             final var outChannel = webSocketConnection.connect().get();
-
                             outChannel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
                             outChannel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.PROXY_TO_DOWNSTREAM);
                             outChannel.getReceiveSetter().set(new WebSocketSessionProxyReceiveListener(CHANNELS));
