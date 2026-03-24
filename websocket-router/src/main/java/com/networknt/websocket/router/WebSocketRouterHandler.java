@@ -12,11 +12,16 @@ import io.undertow.client.ProxiedRequestAttachments;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import io.undertow.util.PathMatcher;
 import io.undertow.websockets.WebSocketConnectionCallback;
 import io.undertow.websockets.WebSocketProtocolHandshakeHandler;
-import io.undertow.websockets.client.WebSocketClient;
+import io.undertow.websockets.client.WebSocketClientNegotiation;
 import io.undertow.websockets.core.WebSocketChannel;
+import io.undertow.websockets.core.protocol.Handshake;
+import io.undertow.websockets.core.protocol.version07.Hybi07Handshake;
+import io.undertow.websockets.core.protocol.version08.Hybi08Handshake;
+import io.undertow.websockets.core.protocol.version13.Hybi13Handshake;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConnectionCallback {
@@ -69,7 +74,17 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         if (isWsRequest) {
             // Delegate to Undertow's WebSocketProtocolHandshakeHandler
             // which handles the upgrade and calls our onConnect callback
-            new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+            String protocolHeader = exchange.getRequestHeaders().getFirst("Sec-WebSocket-Protocol");
+            if (protocolHeader != null) {
+                Set<String> subprotocols = new LinkedHashSet<>(Arrays.asList(protocolHeader.split(",")));
+                Collection<Handshake> handshakes = new ArrayList<>();
+                handshakes.add(new Hybi13Handshake(subprotocols, false));
+                handshakes.add(new Hybi08Handshake(subprotocols, false));
+                handshakes.add(new Hybi07Handshake(subprotocols, false));
+                new WebSocketProtocolHandshakeHandler(handshakes, this).handleRequest(exchange);
+            } else {
+                new WebSocketProtocolHandshakeHandler(this).handleRequest(exchange);
+            }
         } else {
             // Not a websocket request for us, pass to next handler
             Handler.next(exchange, next);
@@ -191,13 +206,23 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                             }
 
                             /* create new connection to downstream */
-                            final var webSocketConnection = new WebSocketClient.ConnectionBuilder(
+                            String subprotocol = exchange.getRequestHeader("Sec-WebSocket-Protocol");
+                            List<String> subprotocols = subprotocol != null ? Collections.singletonList(subprotocol) : Collections.emptyList();
+                            WebSocketClientNegotiation negotiation = new WebSocketClientNegotiation(subprotocols, Collections.emptyList()) {
+                                @Override
+                                public void beforeRequest(Map<String, List<String>> headers) {
+                                    if (subprotocol != null) {
+                                        headers.put("Sec-WebSocket-Protocol", Collections.singletonList(subprotocol));
+                                    }
+                                }
+                            };
+
+                            final var webSocketConnection = new io.undertow.websockets.client.WebSocketClient.ConnectionBuilder(
                                     channel.getWorker(),
                                     channel.getBufferPool(),
                                     new URI(targetUri)
-                            );
+                            ).setClientNegotiation(negotiation);
                             final var outChannel = webSocketConnection.connect().get();
-
                             outChannel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
                             outChannel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.PROXY_TO_DOWNSTREAM);
                             outChannel.getReceiveSetter().set(new WebSocketSessionProxyReceiveListener(CHANNELS));
