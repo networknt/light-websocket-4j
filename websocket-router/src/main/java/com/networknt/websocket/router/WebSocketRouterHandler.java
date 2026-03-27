@@ -245,10 +245,6 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                                     if (authorization != null && !authorization.isBlank()) {
                                         headers.put(Headers.AUTHORIZATION_STRING, Collections.singletonList(authorization));
                                     }
-                                    String jwtClaims = exchange.getRequestHeader("jwtClaims");
-                                    if (jwtClaims != null && !jwtClaims.isBlank()) {
-                                        headers.put("jwtClaims", Collections.singletonList(jwtClaims));
-                                    }
                                 }
                             };
 
