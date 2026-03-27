@@ -241,6 +241,10 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                                     if (!subprotocols.isEmpty()) {
                                         headers.put("Sec-WebSocket-Protocol", Collections.singletonList(String.join(", ", subprotocols)));
                                     }
+                                    String authorization = exchange.getRequestHeader(Headers.AUTHORIZATION_STRING);
+                                    if (authorization != null && !authorization.isBlank()) {
+                                        headers.put(Headers.AUTHORIZATION_STRING, Collections.singletonList(authorization));
+                                    }
                                 }
                             };
 
