@@ -5,10 +5,11 @@ import io.undertow.websockets.core.WebSockets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * JDK WebSocket.Listener that receives messages from the backend server
@@ -20,6 +21,9 @@ public class JdkBackendWebSocketListener implements WebSocket.Listener {
     private final WebSocketChannel frontendChannel;
     private final String channelId;
     private final StringBuilder textBuffer = new StringBuilder();
+    // The JDK WebSocket spec guarantees listener methods are invoked sequentially,
+    // so these accumulation buffers do not require external synchronization.
+    private final ByteArrayOutputStream binaryBuffer = new ByteArrayOutputStream();
 
     /**
      * Constructs a new JdkBackendWebSocketListener.
@@ -51,32 +55,57 @@ public class JdkBackendWebSocketListener implements WebSocket.Listener {
                 WebSockets.sendText(message, frontendChannel, new io.undertow.websockets.core.WebSocketCallback<Void>() {
                     @Override
                     public void complete(WebSocketChannel channel, Void context) {
+                        webSocket.request(1);
                         future.complete(null);
                     }
 
                     @Override
                     public void onError(WebSocketChannel channel, Void context, Throwable throwable) {
                         LOG.error("Failed to forward text message to frontend for channelId: {}", channelId, throwable);
+                        webSocket.request(1);
                         future.complete(null);
                     }
                 });
-                webSocket.request(1);
                 return future;
             }
         }
         webSocket.request(1);
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
-        if (LOG.isTraceEnabled()) LOG.trace("Received binary from backend for channelId: {}", channelId);
-        if (frontendChannel.isOpen()) {
-            // Forward binary data to the frontend as-is via pooled buffer
-            WebSockets.sendBinary(data, frontendChannel, null);
+        // Copy JDK-owned ByteBuffer contents immediately — the buffer may be reused after return
+        byte[] chunk = new byte[data.remaining()];
+        data.get(chunk);
+        binaryBuffer.write(chunk, 0, chunk.length);
+
+        if (last) {
+            byte[] bytes = binaryBuffer.toByteArray();
+            binaryBuffer.reset();
+            if (LOG.isTraceEnabled()) LOG.trace("Received binary from backend for channelId: {}, length: {}", channelId, bytes.length);
+            if (frontendChannel.isOpen()) {
+                CompletableFuture<Void> future = new CompletableFuture<>();
+                WebSockets.sendBinary(ByteBuffer.wrap(bytes), frontendChannel, new io.undertow.websockets.core.WebSocketCallback<Void>() {
+                    @Override
+                    public void complete(WebSocketChannel channel, Void context) {
+                        webSocket.request(1);
+                        future.complete(null);
+                    }
+
+                    @Override
+                    public void onError(WebSocketChannel channel, Void context, Throwable throwable) {
+                        LOG.error("Failed to forward binary message to frontend for channelId: {}", channelId, throwable);
+                        webSocket.request(1);
+                        future.complete(null);
+                    }
+                });
+                return future;
+            }
         }
+        // Non-last fragment or channel closed: request the next fragment immediately
         webSocket.request(1);
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
