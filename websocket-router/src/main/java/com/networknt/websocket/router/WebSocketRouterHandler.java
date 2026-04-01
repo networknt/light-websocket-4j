@@ -206,29 +206,39 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                         }
                     }
 
-                    // Connect to the backend using JDK WebSocket client
+                    // Connect to the backend asynchronously to avoid blocking the I/O thread
                     final String finalChannelId = channelId;
-                    WebSocket backendWs = wsBuilder
+                    wsBuilder
                             .buildAsync(new URI(targetUri), new JdkBackendWebSocketListener(channel, channelId))
-                            .join();
+                            .whenComplete((backendWs, ex) -> {
+                                if (ex != null) {
+                                    LOG.error("Failed to create backend WebSocket connection to: {}", targetUri, ex);
+                                    BACKEND_CHANNELS.remove(finalChannelId);
+                                    try {
+                                        channel.sendClose();
+                                    } catch (IOException closeEx) {
+                                        LOG.error("Failed to close frontend channel", closeEx);
+                                    }
+                                } else {
+                                    // Store the backend connection
+                                    BACKEND_CHANNELS.put(finalChannelId, backendWs);
+                                    if (LOG.isDebugEnabled()) LOG.debug("Backend WebSocket connected for channelId: {}", finalChannelId);
 
-                    // Store the backend connection
-                    BACKEND_CHANNELS.put(channelId, backendWs);
-                    if (LOG.isDebugEnabled()) LOG.debug("Backend WebSocket connected for channelId: {}", channelId);
+                                    // Set up close listener on the frontend channel to clean up
+                                    channel.addCloseTask(ch -> {
+                                        if (LOG.isDebugEnabled()) LOG.debug("Frontend channel closed, cleaning up channelId: {}", finalChannelId);
+                                        WebSocket removed = BACKEND_CHANNELS.remove(finalChannelId);
+                                        if (removed != null && !removed.isOutputClosed()) {
+                                            removed.sendClose(WebSocket.NORMAL_CLOSURE, "Frontend closed");
+                                        }
+                                    });
 
-                    // Set up close listener on the frontend channel to clean up
-                    channel.addCloseTask(ch -> {
-                        if (LOG.isDebugEnabled()) LOG.debug("Frontend channel closed, cleaning up channelId: {}", finalChannelId);
-                        WebSocket removed = BACKEND_CHANNELS.remove(finalChannelId);
-                        if (removed != null && !removed.isOutputClosed()) {
-                            removed.sendClose(WebSocket.NORMAL_CLOSURE, "Frontend closed");
-                        }
-                    });
-
-                    channel.resumeReceives();
+                                    channel.resumeReceives();
+                                }
+                            });
 
                 } catch (Exception e) {
-                    LOG.error("Failed to create backend WebSocket connection to: {}", targetUri, e);
+                    LOG.error("Failed to set up backend WebSocket connection to: {}", targetUri, e);
                     BACKEND_CHANNELS.remove(channelId);
                     try {
                         channel.sendClose();
