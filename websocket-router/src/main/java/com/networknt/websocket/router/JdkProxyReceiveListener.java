@@ -52,17 +52,26 @@ public class JdkProxyReceiveListener extends AbstractReceiveListener {
         WebSocket backend = backendChannels.get(channelId);
         if (backend != null) {
             if (LOG.isTraceEnabled()) LOG.trace("Forwarding binary from frontend to backend for channelId: {}", channelId);
+            // Coalesce pooled buffers into a single owned ByteBuffer before freeing the pool.
+            // sendBinary is asynchronous and may read the buffers after this method returns,
+            // so we must not free the pooled buffers until the copy is made.
             Pooled<ByteBuffer[]> pooled = message.getData();
+            ByteBuffer copy;
             try {
                 ByteBuffer[] buffers = pooled.getResource();
-                for (int i = 0; i < buffers.length; i++) {
-                    ByteBuffer buf = buffers[i];
-                    boolean last = (i == buffers.length - 1);
-                    backend.sendBinary(buf, last);
+                int totalBytes = 0;
+                for (ByteBuffer buf : buffers) {
+                    totalBytes += buf.remaining();
                 }
+                copy = ByteBuffer.allocate(totalBytes);
+                for (ByteBuffer buf : buffers) {
+                    copy.put(buf);
+                }
+                copy.flip();
             } finally {
                 pooled.free();
             }
+            backend.sendBinary(copy, true);
         } else {
             LOG.warn("No backend WebSocket found for channelId: {}", channelId);
         }
