@@ -197,11 +197,20 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                     String subprotocolHeader = exchange.getRequestHeader("Sec-WebSocket-Protocol");
                     if (subprotocolHeader != null && !subprotocolHeader.isBlank()) {
                         String[] subprotocols = subprotocolHeader.split(",");
+                        ArrayList<String> protocolList = new ArrayList<>();
                         for (String sp : subprotocols) {
                             String trimmed = sp.trim();
                             if (!trimmed.isEmpty()) {
-                                wsBuilder.subprotocols(trimmed);
-                                break; // JDK WebSocket only supports one subprotocol at a time
+                                protocolList.add(trimmed);
+                            }
+                        }
+                        if (!protocolList.isEmpty()) {
+                            String[] protocolsArray = protocolList.toArray(new String[0]);
+                            if (protocolsArray.length == 1) {
+                                wsBuilder.subprotocols(protocolsArray[0]);
+                            } else {
+                                String[] rest = java.util.Arrays.copyOfRange(protocolsArray, 1, protocolsArray.length);
+                                wsBuilder.subprotocols(protocolsArray[0], rest);
                             }
                         }
                     }
