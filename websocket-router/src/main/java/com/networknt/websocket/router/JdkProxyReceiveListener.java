@@ -55,8 +55,10 @@ public class JdkProxyReceiveListener extends AbstractReceiveListener {
             Pooled<ByteBuffer[]> pooled = message.getData();
             try {
                 ByteBuffer[] buffers = pooled.getResource();
-                for (ByteBuffer buf : buffers) {
-                    backend.sendBinary(buf, true);
+                for (int i = 0; i < buffers.length; i++) {
+                    ByteBuffer buf = buffers[i];
+                    boolean last = (i == buffers.length - 1);
+                    backend.sendBinary(buf, last);
                 }
             } finally {
                 pooled.free();
