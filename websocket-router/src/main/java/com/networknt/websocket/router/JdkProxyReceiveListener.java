@@ -59,11 +59,14 @@ public class JdkProxyReceiveListener extends AbstractReceiveListener {
             ByteBuffer copy;
             try {
                 ByteBuffer[] buffers = pooled.getResource();
-                int totalBytes = 0;
+                long totalBytes = 0L;
                 for (ByteBuffer buf : buffers) {
                     totalBytes += buf.remaining();
                 }
-                copy = ByteBuffer.allocate(totalBytes);
+                if (totalBytes > Integer.MAX_VALUE) {
+                    throw new IOException("WebSocket binary message too large: " + totalBytes + " bytes");
+                }
+                copy = ByteBuffer.allocate((int) totalBytes);
                 for (ByteBuffer buf : buffers) {
                     copy.put(buf);
                 }
