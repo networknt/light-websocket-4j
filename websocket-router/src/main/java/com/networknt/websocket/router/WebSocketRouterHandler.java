@@ -220,6 +220,17 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
                                         LOG.error("Failed to close frontend channel", closeEx);
                                     }
                                 } else {
+                                    // Guard against the frontend channel having closed while the
+                                    // async backend connect was in flight; if so, close the backend
+                                    // immediately and skip storing it to prevent a connection/map leak.
+                                    if (!channel.isOpen()) {
+                                        LOG.warn("Frontend channel already closed before backend connected, channelId: {}", finalChannelId);
+                                        if (!backendWs.isOutputClosed()) {
+                                            backendWs.sendClose(WebSocket.NORMAL_CLOSURE, "Frontend closed");
+                                        }
+                                        return;
+                                    }
+
                                     // Store the backend connection
                                     BACKEND_CHANNELS.put(finalChannelId, backendWs);
                                     if (LOG.isDebugEnabled()) LOG.debug("Backend WebSocket connected for channelId: {}", finalChannelId);
