@@ -1,21 +1,18 @@
 package com.networknt.websocket.router;
 
+import com.networknt.client.Http2Client;
 import com.networknt.cluster.Cluster;
 import com.networknt.handler.Handler;
 import com.networknt.handler.MiddlewareHandler;
 import com.networknt.router.RouterConfig;
 import com.networknt.service.SingletonServiceFactory;
 import com.networknt.websocket.client.WsAttributes;
-import com.networknt.websocket.client.WsProxyClientPair;
 import io.undertow.Handlers;
-import io.undertow.client.ProxiedRequestAttachments;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.Headers;
 import io.undertow.util.PathMatcher;
 import io.undertow.websockets.WebSocketConnectionCallback;
 import io.undertow.websockets.WebSocketProtocolHandshakeHandler;
-import io.undertow.websockets.client.WebSocketClientNegotiation;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.protocol.Handshake;
 import io.undertow.websockets.core.protocol.version07.Hybi07Handshake;
@@ -25,24 +22,29 @@ import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.net.http.WebSocket;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * WebSocket router handler that proxies WebSocket connections from the frontend
+ * (client) to the backend service. Uses JDK HttpClient for the backend WebSocket
+ * connection to support TLS 1.3.
+ */
 public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConnectionCallback {
     private static final Logger LOG = LoggerFactory.getLogger(WebSocketRouterHandler.class);
     private static final Cluster CLUSTER = SingletonServiceFactory.getBean(Cluster.class);
     private static final RouterConfig CONFIG = RouterConfig.load();
     private static final WebSocketRouterConfig WS_CONFIG = WebSocketRouterConfig.load();
-    private static final Map<String, WsProxyClientPair> CHANNELS = new ConcurrentHashMap<>();
+    private static final Map<String, WebSocket> BACKEND_CHANNELS = new ConcurrentHashMap<>();
     private static final PathMatcher<String> pathMatcher = new PathMatcher<>();
 
     private volatile HttpHandler next;
@@ -55,6 +57,9 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         }
     }
 
+    /**
+     * Default constructor for WebSocketRouterHandler.
+     */
     public WebSocketRouterHandler() {
         // Initialize config or logger if needed
     }
@@ -129,23 +134,6 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     
     @Override
     public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
-        // Detect protocol from URI if it's absolute, otherwise use a safe default or check context.
-        // The previous startsWith check was always false for relative paths like /chat.
-        // Detect protocol from outgoing request URI if absolute, otherwise use a safe default or check X-Forwarded-Proto
-        String protocol = WsAttributes.WEBSOCKET_PROTOCOL;
-        String xForwardedProto = exchange.getRequestHeader("X-Forwarded-Proto");
-        if ("https".equalsIgnoreCase(xForwardedProto)) {
-            protocol = WsAttributes.WEBSOCKET_SECURE_PROTOCOL;
-        } else {
-            // Check if the current exchange URI is absolute and starts with wss
-            String requestURI = exchange.getRequestURI();
-            if (requestURI != null && requestURI.startsWith(WsAttributes.WEBSOCKET_SECURE_PROTOCOL)) {
-                protocol = WsAttributes.WEBSOCKET_SECURE_PROTOCOL;
-            }
-        }
-
-        if (LOG.isTraceEnabled()) LOG.trace("Detected protocol: {} from request URI: {}", protocol, exchange.getRequestURI());
-
         String serviceId = exchange.getRequestHeader("service_id");
         if(serviceId == null) {
             String requestURI = exchange.getRequestURI();
@@ -161,115 +149,92 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         }
         
         if (serviceId != null) {
-            final var downstreamUrl = CLUSTER.serviceToUrl(protocol, serviceId, null, null);
+            // Discover the backend URL using "https" as the service discovery protocol,
+            // since services register with https. Then derive ws/wss from the scheme.
+            final var downstreamUrl = CLUSTER.serviceToUrl("https", serviceId, null, null);
+            if (LOG.isTraceEnabled()) LOG.trace("Discovered downstreamUrl: {} for serviceId: {}", downstreamUrl, serviceId);
             if (downstreamUrl != null) {
                 String channelId = exchange.getRequestHeader(WsAttributes.CHANNEL_GROUP_ID);
                 if (channelId == null) {
                     channelId = java.util.UUID.randomUUID().toString();
                 }
                 
-                if(LOG.isTraceEnabled()) LOG.trace("channelId = {}", channelId);
+                if (LOG.isTraceEnabled()) LOG.trace("channelId = {}", channelId);
                 
-                if (channelId != null) {
-                    channel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
-                    channel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.CLIENT_TO_PROXY);
-                    channel.getReceiveSetter().set(new WebSocketSessionProxyReceiveListener(CHANNELS));
-                    
-                    if (!CHANNELS.containsKey(channelId)) {
-                        try {
-                            final var targetUri = downstreamUrl + exchange.getRequestURI();
-                            final var address = channel.getSourceAddress();
-                            final String remoteHost;
+                // Convert http/https scheme to ws/wss for WebSocket connection
+                String wsBaseUrl;
+                if (downstreamUrl.startsWith("https://")) {
+                    wsBaseUrl = "wss://" + downstreamUrl.substring("https://".length());
+                } else if (downstreamUrl.startsWith("http://")) {
+                    wsBaseUrl = "ws://" + downstreamUrl.substring("http://".length());
+                } else {
+                    wsBaseUrl = downstreamUrl;
+                }
+                final var targetUri = wsBaseUrl + exchange.getRequestURI();
+                if (LOG.isDebugEnabled()) LOG.debug("Connecting to backend WebSocket: {}", targetUri);
 
-                            /* add remote host and remote address attachments */
-                            if (address != null) {
-                                remoteHost = address.getHostString();
-                                if (!address.isUnresolved()) {
-                                    exchange.putAttachment(ProxiedRequestAttachments.REMOTE_ADDRESS, address.getAddress().getHostAddress());
-                                }
-                            } else remoteHost = "localhost";
-                            exchange.putAttachment(ProxiedRequestAttachments.REMOTE_HOST, remoteHost);
-
-                            /* add server name attachment */
-                            String host;
-                            if (CONFIG.isReuseXForwarded()) {
-                                host = exchange.getRequestHeader(Headers.X_FORWARDED_SERVER_STRING);
-                            } else {
-                                host = exchange.getRequestHeader(Headers.HOST_STRING);
-                                if (host == null || "".equals(host.trim())) {
-                                    host  = channel.getDestinationAddress().getHostString();
-                                } else {
-                                    if (host.startsWith("[")) {
-                                        host = host.substring(1, host.indexOf(']'));
-                                    } else if (host.indexOf(':') != -1) {
-                                        host = host.substring(0, host.indexOf(':'));
-                                    }
-                                }
-                            }
-                            exchange.putAttachment(ProxiedRequestAttachments.SERVER_NAME, host);
-
-                            /* attach x-forwarded-port */
-                            String port;
-                            if (CONFIG.isReuseXForwarded() && exchange.getRequestHeader(Headers.X_FORWARDED_PORT_STRING) != null) {
-                                try {
-                                    port = exchange.getRequestHeader(Headers.X_FORWARDED_PORT_STRING);
-                                    exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
-
-                                } catch (NumberFormatException e) {
-                                    port = String.valueOf(channel.getDestinationAddress().getPort());
-                                    exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
-                                }
-                            } else {
-                                port = String.valueOf(channel.getDestinationAddress().getPort());
-                                exchange.putAttachment(ProxiedRequestAttachments.SERVER_PORT, Integer.parseInt(port));
-                            }
-
-                            /* create new connection to downstream */
-                            String subprotocolHeader = exchange.getRequestHeader("Sec-WebSocket-Protocol");
-                            final List<String> subprotocols = new ArrayList<>();
-                            if (subprotocolHeader != null) {
-                                for (String token : subprotocolHeader.split(",")) {
-                                    String trimmed = token.trim();
-                                    if (!trimmed.isEmpty()) {
-                                        subprotocols.add(trimmed);
-                                    }
-                                }
-                            }
-                            WebSocketClientNegotiation negotiation = new WebSocketClientNegotiation(subprotocols, Collections.emptyList()) {
-                                @Override
-                                public void beforeRequest(Map<String, List<String>> headers) {
-                                    if (!subprotocols.isEmpty()) {
-                                        headers.put("Sec-WebSocket-Protocol", Collections.singletonList(String.join(", ", subprotocols)));
-                                    }
-                                    String authorization = exchange.getRequestHeader(Headers.AUTHORIZATION_STRING);
-                                    if (authorization != null && !authorization.isBlank()) {
-                                        headers.put(Headers.AUTHORIZATION_STRING, Collections.singletonList(authorization));
-                                    }
-                                }
-                            };
-
-                            final var webSocketConnection = new io.undertow.websockets.client.WebSocketClient.ConnectionBuilder(
-                                    channel.getWorker(),
-                                    channel.getBufferPool(),
-                                    new URI(targetUri)
-                            ).setClientNegotiation(negotiation);
-                            final var outChannel = webSocketConnection.connect().get();
-                            outChannel.setAttribute(WsAttributes.CHANNEL_GROUP_ID, channelId);
-                            outChannel.setAttribute(WsAttributes.CHANNEL_DIRECTION, WsProxyClientPair.SocketFlow.PROXY_TO_DOWNSTREAM);
-                            outChannel.getReceiveSetter().set(new WebSocketSessionProxyReceiveListener(CHANNELS));
-                            CHANNELS.put(channelId, new WsProxyClientPair(channel, outChannel));
-                            outChannel.resumeReceives();
-                        } catch (URISyntaxException | IOException e) {
-                            LOG.error("Failed to create connection to the backend.", e);
-                            try {
-                                channel.sendClose();
-                            } catch (IOException ex) {
-                                throw new RuntimeException(ex);
-                            }
-                            exchange.endExchange();
+                // Set the frontend receive listener to forward messages to the backend
+                channel.getReceiveSetter().set(new JdkProxyReceiveListener(BACKEND_CHANNELS, channelId));
+                
+                try {
+                    // Build JDK HttpClient with SSL support
+                    HttpClient.Builder httpClientBuilder = HttpClient.newBuilder();
+                    if (targetUri.startsWith("wss://")) {
+                        SSLContext sslContext = Http2Client.createSSLContext();
+                        if (sslContext != null) {
+                            httpClientBuilder.sslContext(sslContext);
                         }
                     }
+                    HttpClient httpClient = httpClientBuilder.build();
+
+                    // Build the WebSocket connection with authorization header if present
+                    java.net.http.WebSocket.Builder wsBuilder = httpClient.newWebSocketBuilder();
+                    String authorization = exchange.getRequestHeader("Authorization");
+                    if (authorization != null && !authorization.isBlank()) {
+                        wsBuilder.header("Authorization", authorization);
+                    }
+                    // Forward subprotocols if present
+                    String subprotocolHeader = exchange.getRequestHeader("Sec-WebSocket-Protocol");
+                    if (subprotocolHeader != null && !subprotocolHeader.isBlank()) {
+                        String[] subprotocols = subprotocolHeader.split(",");
+                        for (String sp : subprotocols) {
+                            String trimmed = sp.trim();
+                            if (!trimmed.isEmpty()) {
+                                wsBuilder.subprotocols(trimmed);
+                                break; // JDK WebSocket only supports one subprotocol at a time
+                            }
+                        }
+                    }
+
+                    // Connect to the backend using JDK WebSocket client
+                    final String finalChannelId = channelId;
+                    WebSocket backendWs = wsBuilder
+                            .buildAsync(new URI(targetUri), new JdkBackendWebSocketListener(channel, channelId))
+                            .join();
+
+                    // Store the backend connection
+                    BACKEND_CHANNELS.put(channelId, backendWs);
+                    if (LOG.isDebugEnabled()) LOG.debug("Backend WebSocket connected for channelId: {}", channelId);
+
+                    // Set up close listener on the frontend channel to clean up
+                    channel.addCloseTask(ch -> {
+                        if (LOG.isDebugEnabled()) LOG.debug("Frontend channel closed, cleaning up channelId: {}", finalChannelId);
+                        WebSocket removed = BACKEND_CHANNELS.remove(finalChannelId);
+                        if (removed != null && !removed.isOutputClosed()) {
+                            removed.sendClose(WebSocket.NORMAL_CLOSURE, "Frontend closed");
+                        }
+                    });
+
                     channel.resumeReceives();
+
+                } catch (Exception e) {
+                    LOG.error("Failed to create backend WebSocket connection to: {}", targetUri, e);
+                    BACKEND_CHANNELS.remove(channelId);
+                    try {
+                        channel.sendClose();
+                    } catch (IOException ex) {
+                        LOG.error("Failed to close frontend channel", ex);
+                    }
                 }
             } else {
                 LOG.error("Could not find downstream URL for serviceId: {}", serviceId);
