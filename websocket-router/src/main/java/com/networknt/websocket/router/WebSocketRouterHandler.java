@@ -27,11 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -45,13 +41,13 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     private static final RouterConfig CONFIG = RouterConfig.load();
     private static final WebSocketRouterConfig WS_CONFIG = WebSocketRouterConfig.load();
     private static final Map<String, WebSocket> BACKEND_CHANNELS = new ConcurrentHashMap<>();
-    private static final PathMatcher<String> pathMatcher = new PathMatcher<>();
+    private static final PathMatcher<WebSocketRouterConfig.DiscoverableHost> pathMatcher = new PathMatcher<>();
 
     private volatile HttpHandler next;
 
     static {
         if (WS_CONFIG.getPathPrefixService() != null) {
-            for (Map.Entry<String, String> entry : WS_CONFIG.getPathPrefixService().entrySet()) {
+            for (Map.Entry<String, WebSocketRouterConfig.DiscoverableHost> entry : WS_CONFIG.getPathPrefixService().entrySet()) {
                 pathMatcher.addPrefixPath(entry.getKey(), entry.getValue());
             }
         }
@@ -70,12 +66,14 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         boolean isWsRequest = false;
         
         // Check for service_id header
-        if (exchange.getRequestHeaders().contains("service_id")) {
+        if (exchange.getRequestHeaders().contains("service_id") || 
+            exchange.getQueryParameters().containsKey("serviceId") || 
+            exchange.getQueryParameters().containsKey("service_id")) {
             isWsRequest = true;
         } else {
             // Check path mapping
             String path = exchange.getRequestPath();
-             PathMatcher.PathMatch<String> match = pathMatcher.match(path);
+             PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
              if (match.getValue() != null) {
                  isWsRequest = true;
              }
@@ -135,6 +133,18 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     @Override
     public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
         String serviceId = exchange.getRequestHeader("service_id");
+        String protocol = WS_CONFIG.getDefaultProtocol();
+        String envTag = WS_CONFIG.getDefaultEnvTag();
+        if (serviceId == null) {
+            Map<String, List<String>> queryParameters = exchange.getRequestParameters();
+            if (queryParameters != null) {
+                if (queryParameters.containsKey("serviceId")) {
+                    serviceId = queryParameters.get("serviceId").getFirst();
+                } else if (queryParameters.containsKey("service_id")) {
+                    serviceId = queryParameters.get("service_id").getFirst();
+                }
+            }
+        }
         if(serviceId == null) {
             String requestURI = exchange.getRequestURI();
             String path = requestURI;
@@ -142,16 +152,22 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
             if (questionMarkIndex != -1) {
                 path = requestURI.substring(0, questionMarkIndex);
             }
-            PathMatcher.PathMatch<String> match = pathMatcher.match(path);
+            PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
             if (match.getValue() != null) {
-                serviceId = match.getValue();
+                WebSocketRouterConfig.DiscoverableHost discoverableHost = match.getValue();
+                serviceId = discoverableHost.serviceId();
+                if (discoverableHost.protocol() != null && !discoverableHost.protocol().isBlank()) {
+                    protocol = discoverableHost.protocol();
+                }
+                if (discoverableHost.envTag() != null && !discoverableHost.envTag().isBlank()) {
+                    envTag = discoverableHost.envTag();
+                }
             }
         }
         
         if (serviceId != null) {
-            // Discover the backend URL using "https" as the service discovery protocol,
-            // since services register with https. Then derive ws/wss from the scheme.
-            final var downstreamUrl = CLUSTER.serviceToUrl("https", serviceId, null, null);
+            String discoveryProtocol = (protocol != null && !protocol.isBlank()) ? protocol : "https";
+            final var downstreamUrl = CLUSTER.serviceToUrl(discoveryProtocol, serviceId, null, envTag);
             if (LOG.isTraceEnabled()) LOG.trace("Discovered downstreamUrl: {} for serviceId: {}", downstreamUrl, serviceId);
             if (downstreamUrl != null) {
                 String channelId = exchange.getRequestHeader(WsAttributes.CHANNEL_GROUP_ID);

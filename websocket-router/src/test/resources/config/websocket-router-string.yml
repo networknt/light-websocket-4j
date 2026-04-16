@@ -5,5 +5,6 @@ enabled: ${websocket-router.enabled:true}
 defaultProtocol: ${websocket-router.defaultProtocol:http}
 # Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc.
 defaultEnvTag: ${websocket-router.defaultEnvTag:}
-# Map of path prefix to downstream host attributes for routing when service_id header is missing.
-pathPrefixService: ${websocket-router.pathPrefixService:}
+# Map of path prefix to serviceId for routing purposes when service_id header is missing.
+pathPrefixService:
+  /chat: com.networknt.llmchat-1.0.0
