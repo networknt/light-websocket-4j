@@ -27,7 +27,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -136,7 +141,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         String protocol = WS_CONFIG.getDefaultProtocol();
         String envTag = WS_CONFIG.getDefaultEnvTag();
         if (serviceId == null) {
-            Map<String, List<String>> queryParameters = exchange.getRequestParameters();
+            Map<String, Deque<String>> queryParameters = exchange.getRequestParameters();
             if (queryParameters != null) {
                 if (queryParameters.containsKey("serviceId")) {
                     serviceId = queryParameters.get("serviceId").getFirst();
