@@ -3,6 +3,7 @@ package com.networknt.websocket.router;
 import com.networknt.config.Config;
 import com.networknt.config.schema.BooleanField;
 import com.networknt.config.schema.ConfigSchema;
+import com.networknt.config.schema.MapField;
 import com.networknt.config.schema.OutputFormat;
 import com.networknt.config.schema.StringField;
 import com.networknt.server.ModuleRegistry;
