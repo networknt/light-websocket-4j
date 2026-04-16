@@ -139,9 +139,11 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
             Map<String, List<String>> queryParameters = exchange.getRequestParameters();
             if (queryParameters != null) {
                 if (queryParameters.containsKey("serviceId")) {
-                    serviceId = queryParameters.get("serviceId").getFirst();
+                    List<String> serviceIds = queryParameters.get("serviceId");
+                    serviceId = (serviceIds != null && !serviceIds.isEmpty()) ? serviceIds.get(0) : null;
                 } else if (queryParameters.containsKey("service_id")) {
-                    serviceId = queryParameters.get("service_id").getFirst();
+                    List<String> serviceIds = queryParameters.get("service_id");
+                    serviceId = (serviceIds != null && !serviceIds.isEmpty()) ? serviceIds.get(0) : null;
                 }
             }
         }
