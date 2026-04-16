@@ -1,5 +1,6 @@
 package com.networknt.websocket.router;
 
+import com.networknt.cluster.DiscoverableHost;
 import com.networknt.config.Config;
 import com.networknt.config.schema.BooleanField;
 import com.networknt.config.schema.ConfigSchema;
@@ -64,10 +65,7 @@ public class WebSocketRouterConfig {
     )
     Map<String, DiscoverableHost> pathPrefixService;
 
-    public record DiscoverableHost(String protocol, String serviceId, String envTag) {
-    }
-
-    private final Map<String, Object> mappedConfig;
+        private final Map<String, Object> mappedConfig;
     private static volatile WebSocketRouterConfig instance;
 
     private WebSocketRouterConfig() {
