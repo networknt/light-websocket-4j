@@ -190,9 +190,10 @@ public class WebSocketRouterConfig {
         }
         if (rawValue instanceof Map<?, ?>) {
             Map<?, ?> hostMap = (Map<?, ?>) rawValue;
-            String serviceId = firstNonBlank(hostMap.get("serviceId"), hostMap.get("host"));
+            String serviceId = Objects.toString(hostMap.get("serviceId"), null);
+            if(serviceId != null && serviceId.isBlank()) serviceId = null;
             if (serviceId == null) {
-                logger.error("Each pathPrefixService entry must define serviceId or host. entry={}", hostMap);
+                logger.error("Each pathPrefixService entry must define serviceId. entry={}", hostMap);
                 return null;
             }
             String protocol = firstNonBlank(hostMap.get("protocol"), defaultProtocol);

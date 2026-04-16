@@ -19,7 +19,7 @@
     },
     "pathPrefixService" : {
       "type" : "object",
-      "description" : "Map of path prefix to downstream host attributes for routing when service_id header is missing.",
+      "description" : "Map of path prefix to downstream serviceId attributes for routing when service_id header is missing.",
       "additionalProperties" : {
         "oneOf" : [ {
           "type" : "string"
@@ -32,18 +32,11 @@
             "serviceId" : {
               "type" : "string"
             },
-            "host" : {
-              "type" : "string"
-            },
             "envTag" : {
               "type" : "string"
             }
           },
-          "anyOf" : [ {
-            "required" : [ "serviceId" ]
-          }, {
-            "required" : [ "host" ]
-          } ]
+          "required" : [ "serviceId" ]
         } ]
       }
     }
