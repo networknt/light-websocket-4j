@@ -73,10 +73,10 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         } else {
             // Check path mapping
             String path = exchange.getRequestPath();
-             PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
-             if (match.getValue() != null) {
-                 isWsRequest = true;
-             }
+            PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
+            if (match.getValue() != null) {
+                isWsRequest = true;
+            }
         }
 
         if (isWsRequest) {
