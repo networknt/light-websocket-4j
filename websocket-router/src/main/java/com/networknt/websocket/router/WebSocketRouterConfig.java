@@ -1,7 +1,10 @@
 package com.networknt.websocket.router;
 
 import com.networknt.config.Config;
-import com.networknt.config.schema.*;
+import com.networknt.config.schema.BooleanField;
+import com.networknt.config.schema.ConfigSchema;
+import com.networknt.config.schema.OutputFormat;
+import com.networknt.config.schema.StringField;
 import com.networknt.server.ModuleRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
