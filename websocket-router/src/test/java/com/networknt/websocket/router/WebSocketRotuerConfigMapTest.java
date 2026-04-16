@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-public class WebSocketRotuerConfigMapTest {
+class WebSocketRouterConfigMapTest {
     private static WebSocketRouterConfig config;
     @BeforeEach
     public void setUp() {
