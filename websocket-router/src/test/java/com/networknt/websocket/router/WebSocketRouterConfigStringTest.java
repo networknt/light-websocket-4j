@@ -1,5 +1,6 @@
 package com.networknt.websocket.router;
 
+import com.networknt.cluster.DiscoverableHost;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,9 +20,9 @@ public class WebSocketRouterConfigStringTest {
         Assertions.assertEquals("http", config.getDefaultProtocol());
         Assertions.assertNull(config.getDefaultEnvTag());
 
-        Map<String, WebSocketRouterConfig.DiscoverableHost> pathPrefixServiceMap = config.getPathPrefixService();
+        Map<String, DiscoverableHost> pathPrefixServiceMap = config.getPathPrefixService();
         Assertions.assertNotNull(pathPrefixServiceMap);
-        WebSocketRouterConfig.DiscoverableHost discoverableHost = pathPrefixServiceMap.get("/chat");
+        DiscoverableHost discoverableHost = pathPrefixServiceMap.get("/chat");
         Assertions.assertNotNull(discoverableHost);
         Assertions.assertEquals("com.networknt.llmchat-1.0.0", discoverableHost.serviceId());
         Assertions.assertEquals("http", discoverableHost.protocol());

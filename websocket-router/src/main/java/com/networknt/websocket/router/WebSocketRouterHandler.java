@@ -2,6 +2,7 @@ package com.networknt.websocket.router;
 
 import com.networknt.client.Http2Client;
 import com.networknt.cluster.Cluster;
+import com.networknt.cluster.DiscoverableHost;
 import com.networknt.handler.Handler;
 import com.networknt.handler.MiddlewareHandler;
 import com.networknt.router.RouterConfig;
@@ -41,13 +42,13 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
     private static final RouterConfig CONFIG = RouterConfig.load();
     private static final WebSocketRouterConfig WS_CONFIG = WebSocketRouterConfig.load();
     private static final Map<String, WebSocket> BACKEND_CHANNELS = new ConcurrentHashMap<>();
-    private static final PathMatcher<WebSocketRouterConfig.DiscoverableHost> pathMatcher = new PathMatcher<>();
+    private static final PathMatcher<DiscoverableHost> pathMatcher = new PathMatcher<>();
 
     private volatile HttpHandler next;
 
     static {
         if (WS_CONFIG.getPathPrefixService() != null) {
-            for (Map.Entry<String, WebSocketRouterConfig.DiscoverableHost> entry : WS_CONFIG.getPathPrefixService().entrySet()) {
+            for (Map.Entry<String, DiscoverableHost> entry : WS_CONFIG.getPathPrefixService().entrySet()) {
                 pathMatcher.addPrefixPath(entry.getKey(), entry.getValue());
             }
         }
@@ -73,7 +74,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
         } else {
             // Check path mapping
             String path = exchange.getRequestPath();
-            PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
+            PathMatcher.PathMatch<DiscoverableHost> match = pathMatcher.match(path);
             if (match.getValue() != null) {
                 isWsRequest = true;
             }
@@ -154,9 +155,9 @@ public class WebSocketRouterHandler implements MiddlewareHandler, WebSocketConne
             if (questionMarkIndex != -1) {
                 path = requestURI.substring(0, questionMarkIndex);
             }
-            PathMatcher.PathMatch<WebSocketRouterConfig.DiscoverableHost> match = pathMatcher.match(path);
+            PathMatcher.PathMatch<DiscoverableHost> match = pathMatcher.match(path);
             if (match.getValue() != null) {
-                WebSocketRouterConfig.DiscoverableHost discoverableHost = match.getValue();
+                DiscoverableHost discoverableHost = match.getValue();
                 serviceId = discoverableHost.serviceId();
                 if (discoverableHost.protocol() != null && !discoverableHost.protocol().isBlank()) {
                     protocol = discoverableHost.protocol();
