@@ -70,17 +70,17 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
             }
             LOG.trace("Found downstream service entry for request URI: {}", exchange.getRequestURI());
 
-            // discover downstream url
-            String downstreamURL = getDownstreamURL(downstreamService);
-            if(downstreamURL == null || downstreamURL.isBlank()) {
-                LOG.warn("Failed to construct downstream URL from service entry");
-                WebSockets.sendClose(CloseMessage.UNEXPECTED_ERROR, "Failed to construct downstream URL from service entry", channel, null);
+            // discover downstream host
+            String downstreamHost = discoverDownstreamHost(downstreamService);
+            if(downstreamHost == null || downstreamHost.isBlank()) {
+                LOG.warn("Failed to discover downstream host from service entry");
+                WebSockets.sendClose(CloseMessage.UNEXPECTED_ERROR, "Failed to discover downstream host from service entry", channel, null);
                 return;
             }
-            LOG.trace("Constructed downstream URL {} for service {}", downstreamURL, downstreamService.serviceId());
+            LOG.trace("Discovered downstream host {} for service {}", downstreamHost, downstreamService.serviceId());
 
             // start connecting to downstream server
-            String wsURI = resolveWebSocketURI(downstreamURL, exchange);
+            String wsURI = resolveWebSocketURI(downstreamHost, exchange);
             String pairId = UUID.randomUUID().toString();
             if(startDownstreamConnection(wsURI, exchange, pairId, channel) == null) {
                 LOG.warn("Failed to initiate connection to downstream server at {}", wsURI);
@@ -162,7 +162,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
                     }
                 }
             }
-            LOG.trace("{} protocols found on request {}", protocols.size(), exchange.getRequestPath());
+            LOG.trace("{} protocol(s) found on request {}", protocols.size(), exchange.getRequestPath());
         }
 
         return protocols;
@@ -175,7 +175,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         return pathMatcher.match(path).getValue();
     }
 
-    private String getDownstreamURL(DiscoverableHost downstreamService) {
+    private String discoverDownstreamHost(DiscoverableHost downstreamService) {
         String serviceId = downstreamService.serviceId();
         if(serviceId == null || serviceId.isBlank()) {
             LOG.error("Downstream service entry's serviceId cannot be null or blank");
@@ -192,12 +192,12 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         return cluster.serviceToUrl(protocol, serviceId, null, envTag);
     }
 
-    private String resolveWebSocketURI(String downstreamURL, WebSocketHttpExchange exchange) {
-        String wsBaseURL = downstreamURL.startsWith("https://") ?
-                "wss://" + downstreamURL.substring("https://".length()) :
-                "ws://" + downstreamURL.substring("http://".length());
+    private String resolveWebSocketURI(String downstreamHost, WebSocketHttpExchange exchange) {
+        String wsBaseURL = downstreamHost.startsWith("https://") ?
+                "wss://" + downstreamHost.substring("https://".length()) :
+                "ws://" + downstreamHost.substring("http://".length());
         String wsTargetURI = wsBaseURL + exchange.getRequestURI();
-        LOG.trace("Downstream URL resolved to {}", wsTargetURI);
+        LOG.trace("WebSocket URI resolved to {}", wsTargetURI);
         return wsTargetURI;
     }
 
