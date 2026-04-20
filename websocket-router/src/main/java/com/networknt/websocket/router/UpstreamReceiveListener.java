@@ -31,7 +31,7 @@ public class UpstreamReceiveListener extends AbstractReceiveListener {
 
     @Override
     protected void onFullTextMessage(final WebSocketChannel channel, final BufferedTextMessage message) {
-        if(downstreamChannel.isInputClosed() || downstreamChannel.isOutputClosed()) {
+        if(downstreamChannel.isOutputClosed()) {
             LOG.warn("Downstream is closed. Cannot forward text message for {}", pairId);
             return;
         }
@@ -43,7 +43,7 @@ public class UpstreamReceiveListener extends AbstractReceiveListener {
 
     @Override
     protected void onFullBinaryMessage(final WebSocketChannel channel, final BufferedBinaryMessage message) throws IOException {
-        if(downstreamChannel.isInputClosed() || downstreamChannel.isOutputClosed()) {
+        if(downstreamChannel.isOutputClosed()) {
             LOG.warn("Downstream is closed. Cannot forward binary message for {}", pairId);
             return;
         }
@@ -77,7 +77,7 @@ public class UpstreamReceiveListener extends AbstractReceiveListener {
 
     @Override
     protected void onCloseMessage(CloseMessage cm, WebSocketChannel channel) {
-        if(downstreamChannel.isInputClosed() || downstreamChannel.isOutputClosed()) {
+        if(downstreamChannel.isOutputClosed()) {
             return;
         }
 
@@ -95,7 +95,7 @@ public class UpstreamReceiveListener extends AbstractReceiveListener {
         LOG.error("Upstream error for {}", pairId, error);
         IoUtils.safeClose(channel);
 
-        if(!downstreamChannel.isInputClosed() && !downstreamChannel.isOutputClosed()) {
+        if(!downstreamChannel.isOutputClosed()) {
             LOG.trace("Closing downstream for {} due to upstream error", pairId);
             downstreamChannel.sendClose(CloseMessage.UNEXPECTED_ERROR, "Upstream encountered error");
         }

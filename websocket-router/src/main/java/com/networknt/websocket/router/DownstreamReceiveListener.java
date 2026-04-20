@@ -31,6 +31,12 @@ public class DownstreamReceiveListener implements WebSocket.Listener {
     }
 
     @Override
+    public void onOpen(WebSocket webSocket) {
+        LOG.trace("Downstream connection established for {}", pairId);
+        webSocket.request(1);
+    }
+
+    @Override
     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
         textBuffer.append(data);
         if(!last) {

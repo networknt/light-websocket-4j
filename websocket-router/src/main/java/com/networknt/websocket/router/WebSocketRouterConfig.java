@@ -53,7 +53,8 @@ public class WebSocketRouterConfig {
     @StringField(
             configFieldName = DEFAULT_ENV_TAG,
             externalizedKeyName = DEFAULT_ENV_TAG,
-            description = "Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc."
+            description = "Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc.",
+            defaultValue = "dev"
     )
     String defaultEnvTag;
 
