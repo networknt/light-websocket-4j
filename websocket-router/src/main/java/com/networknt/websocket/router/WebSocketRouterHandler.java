@@ -46,7 +46,6 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
     private final WebSocketConnectionCallback wsHandshakeCallback;
     private final HttpHandler wsHandshakeNext;
     private final HttpClient httpClient;
-    private final HttpClient httpsClient;
 
     private volatile HttpHandler next;
 
@@ -93,22 +92,19 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         // build ws handshake next handler
         wsHandshakeNext = exchange -> Handler.next(exchange, next);
 
-        // build plain text http client
-        httpClient = HttpClient.newBuilder().build();
-
-        // build ssl secured http client
-        SSLContext sslContext = null;
+        // build http client
+        HttpClient.Builder httpClientBuilder = HttpClient.newBuilder();
         try {
-            sslContext = Http2Client.createSSLContext();
+            SSLContext sslContext = Http2Client.createSSLContext();
+            if(sslContext != null) {
+                httpClientBuilder.sslContext(sslContext);
+            } else {
+                LOG.warn("SSL context is null. Secure downstream connections are not available");
+            }
         } catch(Exception e) {
-            LOG.warn("Failed to create SSLContext for secure downstream connections", e);
+            LOG.warn("Failed to create SSLContext. Secure downstream connections are not available", e);
         }
-        if(sslContext != null) {
-            httpsClient = HttpClient.newBuilder().sslContext(sslContext).build();
-        } else {
-            httpsClient = null;
-            LOG.warn("Unable to create SSL secured HTTP client");
-        }
+        httpClient = httpClientBuilder.build();
 
         LOG.info("WebSocketRouterHandler loaded");
     }
@@ -202,16 +198,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
     }
 
     private CompletableFuture<WebSocket> startDownstreamConnection(String wsURI, WebSocketHttpExchange exchange, String pairId, WebSocketChannel upstreamChannel) {
-        WebSocket.Builder wsBuilder;
-        if (wsURI.startsWith("wss://")) {
-            if(httpsClient == null) {
-                LOG.error("Cannot make secured connection without SSL secured HTTP client");
-                return null;
-            }
-            wsBuilder = httpsClient.newWebSocketBuilder();
-        } else {
-            wsBuilder = httpClient.newWebSocketBuilder();
-        }
+        WebSocket.Builder wsBuilder = httpClient.newWebSocketBuilder();
 
         String authHeader = exchange.getRequestHeader("Authorization");
         if (authHeader != null && !authHeader.isBlank()) {
