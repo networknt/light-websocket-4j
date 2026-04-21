@@ -20,6 +20,10 @@ import java.util.concurrent.CompletionStage;
 public class DownstreamReceiveListener implements WebSocket.Listener {
     private static final Logger LOG = LoggerFactory.getLogger(DownstreamReceiveListener.class);
 
+    // TODO: Implement routing one downstream channel to multiple clients (i.e. 1 service responding to multiple clients)
+    //  See here for more details: https://github.com/networknt/light-websocket-4j/issues/9
+    //  Possible hashmap solution using session id:
+    //   - hashmap captures session id to upstream channel relation
     private final String pairId;
     private final WebSocketChannel upstreamChannel;
     private final StringBuilder textBuffer = new StringBuilder();

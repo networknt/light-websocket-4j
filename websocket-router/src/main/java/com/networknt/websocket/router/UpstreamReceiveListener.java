@@ -21,6 +21,11 @@ import java.nio.ByteBuffer;
 public class UpstreamReceiveListener extends AbstractReceiveListener {
     private static final Logger LOG = LoggerFactory.getLogger(UpstreamReceiveListener.class);
 
+    // TODO: Implement routing multiple clients to a single downstream channel (i.e. multiple clients using 1 service).
+    //  See here for more details: https://github.com/networknt/light-websocket-4j/issues/9
+    //  Possible double hashmap solution using session id:
+    //   - hashmap A captures session id to service id relation
+    //   - hashmap B captures service id to downstream channel relation
     private final String pairId;
     private final WebSocket downstreamChannel;
 
