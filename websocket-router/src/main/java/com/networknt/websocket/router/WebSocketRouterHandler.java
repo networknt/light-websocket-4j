@@ -70,7 +70,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
             LOG.trace("Found downstream service entry for request URI: {}", exchange.getRequestURI());
 
             // discover downstream host
-            String downstreamHost = discoverDownstreamHost(downstreamService);
+            String downstreamHost = cluster.serviceToUrl(downstreamService.protocol(), downstreamService.serviceId(), null, downstreamService.envTag());
             if(downstreamHost == null || downstreamHost.isBlank()) {
                 LOG.warn("Failed to discover downstream host from service entry");
                 WebSockets.sendClose(CloseMessage.UNEXPECTED_ERROR, "Failed to discover downstream host from service entry", channel, null);
@@ -79,14 +79,14 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
             LOG.trace("Discovered downstream host {} for service {}", downstreamHost, downstreamService.serviceId());
 
             // start connecting to downstream server
-            String wsURI = resolveWebSocketURI(downstreamHost, exchange);
+            String wsURL = resolveWebSocketURL(downstreamHost, exchange);
             String pairId = UUID.randomUUID().toString();
-            if(startDownstreamConnection(wsURI, exchange, pairId, channel) == null) {
-                LOG.warn("Failed to initiate connection to downstream server at {}", wsURI);
+            if(startDownstreamConnection(wsURL, exchange, pairId, channel) == null) {
+                LOG.warn("Failed to initiate connection to downstream server at {}", wsURL);
                 WebSockets.sendClose(CloseMessage.UNEXPECTED_ERROR, "Failed to initiate connection to downstream server", channel, null);
                 return;
             }
-            LOG.trace("Starting connection to downstream server at {}", wsURI);
+            LOG.trace("Starting connection to downstream server at {}", wsURL);
         };
 
         // build ws handshake next handler
@@ -165,39 +165,98 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
     }
 
     private DiscoverableHost getDownstreamService(WebSocketHttpExchange exchange) {
-        String requestURI = exchange.getRequestURI();
-        int questionMarkIndex = requestURI.indexOf('?');
-        String path = questionMarkIndex != -1 ? requestURI.substring(0, questionMarkIndex) : requestURI;
-        return pathMatcher.match(path).getValue();
-    }
+        String protocol = config.getDefaultProtocol();
+        String envTag = config.getDefaultEnvTag();
+        String serviceId = null;
 
-    private String discoverDownstreamHost(DiscoverableHost downstreamService) {
-        String serviceId = downstreamService.serviceId();
-        if(serviceId == null || serviceId.isBlank()) {
-            LOG.error("Downstream service entry's serviceId cannot be null or blank");
-            return null;
+        // service id priority 1: header
+        if(exchange.getRequestHeaders().containsKey("Service-Id")) {
+            String headerValue = exchange.getRequestHeader("Service-Id");
+            if(headerValue != null && !headerValue.isBlank()) {
+                serviceId = headerValue;
+                LOG.trace("Found service id {} in header", serviceId);
+            } else {
+                LOG.warn("Header contains Service-Id field, but its value is null or empty");
+            }
         }
 
-        String protocol = downstreamService.protocol() != null && !downstreamService.protocol().isEmpty() ?
-                downstreamService.protocol() :
-                config.getDefaultProtocol();
-        String envTag = downstreamService.envTag() != null && !downstreamService.envTag().isEmpty() ?
-                downstreamService.envTag() :
-                config.getDefaultEnvTag();
+        // service id priority 2: query parameter
+        if(serviceId == null && exchange.getRequestParameters().containsKey("service_id")) {
+            List<String> serviceList = exchange.getRequestParameters().get("service_id");
+            if(!serviceList.isEmpty() && serviceList.get(0) != null && !serviceList.get(0).isEmpty()) {
+                serviceId = serviceList.get(0);
+                LOG.trace("Found service id {} in query parameter", serviceId);
+            } else {
+                LOG.warn("Query string contains service_id parameter, but its value is null or empty");
+            }
+        }
 
-        return cluster.serviceToUrl(protocol, serviceId, null, envTag);
+        // service id priority 3: prefix path
+        if(serviceId == null) {
+            String requestURI = exchange.getRequestURI();
+            int questionMarkIndex = requestURI.indexOf('?');
+            String path = questionMarkIndex != -1 ? requestURI.substring(0, questionMarkIndex) : requestURI;
+
+            DiscoverableHost pathPrefixDiscovery = pathMatcher.match(path).getValue();
+            if(pathPrefixDiscovery != null) {
+                serviceId = pathPrefixDiscovery.serviceId();
+                LOG.trace("Found service id {} in path prefix service", serviceId);
+
+                protocol = pathPrefixDiscovery.protocol() != null && !pathPrefixDiscovery.protocol().isEmpty() ?
+                        pathPrefixDiscovery.protocol() : protocol;
+                envTag = pathPrefixDiscovery.envTag() != null && !pathPrefixDiscovery.envTag().isEmpty() ?
+                        pathPrefixDiscovery.envTag() : envTag;
+            }
+        }
+
+        if(serviceId != null) {
+            List<String> protocolList = exchange.getRequestParameters().get("protocol");
+            if(!protocolList.isEmpty() && protocolList.get(0) != null && !protocolList.get(0).isEmpty()) {
+                protocol = protocolList.get(0);
+            }
+            List<String> envTagList = exchange.getRequestParameters().get("env_tag");
+            if(!envTagList.isEmpty() && envTagList.get(0) != null && !envTagList.get(0).isEmpty()) {
+                envTag = envTagList.get(0);
+            }
+
+            LOG.trace("Service entry found. Protocol: {}. Service Id: {}. Env Tag: {}", protocol, serviceId, envTag);
+            return new DiscoverableHost(protocol, serviceId, envTag);
+        } else {
+            LOG.warn("Checked header, query string, and prefix path for service id but found none");
+            return null;
+        }
     }
 
-    private String resolveWebSocketURI(String downstreamHost, WebSocketHttpExchange exchange) {
+    private String resolveWebSocketURL(String downstreamHost, WebSocketHttpExchange exchange) {
         String wsBaseURL = downstreamHost.startsWith("https://") ?
                 "wss://" + downstreamHost.substring("https://".length()) :
                 "ws://" + downstreamHost.substring("http://".length());
-        String wsTargetURI = wsBaseURL + exchange.getRequestURI();
-        LOG.trace("WebSocket URI resolved to {}", wsTargetURI);
-        return wsTargetURI;
+
+        String wsTargetURL;
+        if(exchange.getQueryString().length() > 0) {
+            String[] queryParams = exchange.getQueryString().split("&");
+            StringBuilder cleanedQueryString = new StringBuilder("?");
+            for(String s : queryParams) {
+                if(s.contains("protocol") || s.contains("service_id") || s.contains("env_tag")) {
+                    continue;
+                }
+                if(cleanedQueryString.length() != 1) {
+                    cleanedQueryString.append("&");
+                }
+                cleanedQueryString.append(s);
+            }
+
+            String requestURI = exchange.getRequestURI();
+            wsTargetURL = wsBaseURL + requestURI.substring(0, requestURI.indexOf('?')) + cleanedQueryString;
+        } else {
+            wsTargetURL = wsBaseURL + exchange.getRequestURI();
+        }
+
+        LOG.trace("WebSocket URL resolved to {}", wsTargetURL);
+        return wsTargetURL;
     }
 
-    private CompletableFuture<WebSocket> startDownstreamConnection(String wsURI, WebSocketHttpExchange exchange, String pairId, WebSocketChannel upstreamChannel) {
+    private CompletableFuture<WebSocket> startDownstreamConnection(String wsURL, WebSocketHttpExchange exchange, String pairId, WebSocketChannel upstreamChannel) {
         WebSocket.Builder wsBuilder = httpClient.newWebSocketBuilder();
 
         String authHeader = exchange.getRequestHeader("Authorization");
@@ -219,10 +278,10 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         }
 
         try {
-            return wsBuilder.buildAsync(new URI(wsURI), new DownstreamReceiveListener(pairId, upstreamChannel))
+            return wsBuilder.buildAsync(new URI(wsURL), new DownstreamReceiveListener(pairId, upstreamChannel))
                     .whenComplete((downstream, throwable) -> {
                         if(throwable != null) {
-                            LOG.error("Failed to connect to downstream server at {}", wsURI, throwable);
+                            LOG.error("Failed to connect to downstream server at {}", wsURL, throwable);
                             WebSockets.sendClose(CloseMessage.UNEXPECTED_ERROR, "Failed to connect to downstream server", upstreamChannel, null);
                             return;
                         }
@@ -232,7 +291,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
                         LOG.trace("Established pair {} for {}", pairId, exchange.getRequestURI());
                     });
         } catch(Exception e) {
-            LOG.error("Failed to create downstream connection builder for {}", wsURI, e);
+            LOG.error("Failed to create downstream connection builder for {}", wsURL, e);
             return null;
         }
     }
