@@ -211,15 +211,15 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
 
         if(serviceId != null) {
             List<String> protocolList = exchange.getRequestParameters().get("protocol");
-            if(!protocolList.isEmpty() && protocolList.get(0) != null && !protocolList.get(0).isEmpty()) {
+            if(protocolList != null && !protocolList.isEmpty() && protocolList.get(0) != null && !protocolList.get(0).isEmpty()) {
                 protocol = protocolList.get(0);
             }
             List<String> envTagList = exchange.getRequestParameters().get("env_tag");
-            if(!envTagList.isEmpty() && envTagList.get(0) != null && !envTagList.get(0).isEmpty()) {
+            if(envTagList != null && !envTagList.isEmpty() && envTagList.get(0) != null && !envTagList.get(0).isEmpty()) {
                 envTag = envTagList.get(0);
             }
 
-            LOG.trace("Service entry found. Protocol: {}. Service Id: {}. Env Tag: {}", protocol, serviceId, envTag);
+            LOG.trace("DiscoverableHost: protocol - {}, service id - {}, env tag - {}", protocol, serviceId, envTag);
             return new DiscoverableHost(protocol, serviceId, envTag);
         } else {
             LOG.warn("Checked header, query string, and prefix path for service id but found none");
@@ -235,6 +235,7 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         String wsTargetURL;
         if(exchange.getQueryString().length() > 0) {
             String[] queryParams = exchange.getQueryString().split("&");
+
             StringBuilder cleanedQueryString = new StringBuilder("?");
             for(String s : queryParams) {
                 if(s.contains("protocol") || s.contains("service_id") || s.contains("env_tag")) {
@@ -246,8 +247,10 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
                 cleanedQueryString.append(s);
             }
 
-            String requestURI = exchange.getRequestURI();
-            wsTargetURL = wsBaseURL + requestURI.substring(0, requestURI.indexOf('?')) + cleanedQueryString;
+            String requestPath = exchange.getRequestURI().substring(0,  exchange.getRequestURI().indexOf('?'));
+            wsTargetURL = cleanedQueryString.length() > 1 ?
+                    wsBaseURL + requestPath + cleanedQueryString :
+                    wsBaseURL + requestPath;
         } else {
             wsTargetURL = wsBaseURL + exchange.getRequestURI();
         }
