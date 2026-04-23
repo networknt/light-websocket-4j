@@ -4,6 +4,6 @@ enabled: ${websocket-router.enabled:true}
 # Default downstream protocol when not specified in the request. It can be http or https.
 defaultProtocol: ${websocket-router.defaultProtocol:http}
 # Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc.
-defaultEnvTag: ${websocket-router.defaultEnvTag:dev}
+defaultEnvTag: ${websocket-router.defaultEnvTag:}
 # Map of path prefix to downstream host attributes for routing when service_id header is missing.
 pathPrefixService: ${websocket-router.pathPrefixService:}

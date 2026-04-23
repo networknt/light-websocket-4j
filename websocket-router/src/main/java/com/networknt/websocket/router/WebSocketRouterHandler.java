@@ -170,24 +170,24 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         String serviceId = null;
 
         // service id priority 1: header
-        if(exchange.getRequestHeaders().containsKey("Service-Id")) {
-            String headerValue = exchange.getRequestHeader("Service-Id");
-            if(headerValue != null && !headerValue.isBlank()) {
-                serviceId = headerValue;
-                LOG.trace("Found service id {} in header", serviceId);
-            } else {
-                LOG.warn("Header contains Service-Id field, but its value is null or empty");
-            }
+        String headerValue = firstNonBlankHeader(exchange, "Service-Id", "service_id", "serviceId");
+        if(headerValue != null) {
+            serviceId = headerValue;
+            LOG.trace("Found service id {} in header", serviceId);
+        } else if(exchange.getRequestHeaders().containsKey("Service-Id")
+                || exchange.getRequestHeaders().containsKey("service_id")
+                || exchange.getRequestHeaders().containsKey("serviceId")) {
+            LOG.warn("Request contains a service id header, but its value is null or empty");
         }
 
         // service id priority 2: query parameter
-        if(serviceId == null && exchange.getRequestParameters().containsKey("service_id")) {
-            List<String> serviceList = exchange.getRequestParameters().get("service_id");
-            if(!serviceList.isEmpty() && serviceList.get(0) != null && !serviceList.get(0).isEmpty()) {
-                serviceId = serviceList.get(0);
+        if(serviceId == null) {
+            serviceId = firstNonBlankParameter(exchange, "service_id", "serviceId");
+            if(serviceId != null) {
                 LOG.trace("Found service id {} in query parameter", serviceId);
-            } else {
-                LOG.warn("Query string contains service_id parameter, but its value is null or empty");
+            } else if(exchange.getRequestParameters().containsKey("service_id")
+                    || exchange.getRequestParameters().containsKey("serviceId")) {
+                LOG.warn("Query string contains a service id parameter, but its value is null or empty");
             }
         }
 
@@ -210,13 +210,13 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
         }
 
         if(serviceId != null) {
-            List<String> protocolList = exchange.getRequestParameters().get("protocol");
-            if(protocolList != null && !protocolList.isEmpty() && protocolList.get(0) != null && !protocolList.get(0).isEmpty()) {
-                protocol = protocolList.get(0);
+            String requestedProtocol = firstNonBlankParameter(exchange, "protocol");
+            if(requestedProtocol != null) {
+                protocol = requestedProtocol;
             }
-            List<String> envTagList = exchange.getRequestParameters().get("env_tag");
-            if(envTagList != null && !envTagList.isEmpty() && envTagList.get(0) != null && !envTagList.get(0).isEmpty()) {
-                envTag = envTagList.get(0);
+            String requestedEnvTag = firstNonBlankParameter(exchange, "env_tag", "envTag");
+            if(requestedEnvTag != null) {
+                envTag = requestedEnvTag;
             }
 
             LOG.trace("DiscoverableHost: protocol - {}, service id - {}, env tag - {}", protocol, serviceId, envTag);
@@ -238,7 +238,12 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
 
             StringBuilder cleanedQueryString = new StringBuilder("?");
             for(String s : queryParams) {
-                if(s.contains("protocol") || s.contains("service_id") || s.contains("env_tag")) {
+                String parameterName = s;
+                int equalsIndex = s.indexOf('=');
+                if(equalsIndex >= 0) {
+                    parameterName = s.substring(0, equalsIndex);
+                }
+                if(isRouterParameter(parameterName)) {
                     continue;
                 }
                 if(cleanedQueryString.length() != 1) {
@@ -257,6 +262,40 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
 
         LOG.trace("WebSocket URL resolved to {}", wsTargetURL);
         return wsTargetURL;
+    }
+
+    private String firstNonBlankHeader(WebSocketHttpExchange exchange, String... headerNames) {
+        for(String headerName : headerNames) {
+            String headerValue = exchange.getRequestHeader(headerName);
+            if(headerValue != null && !headerValue.isBlank()) {
+                return headerValue;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlankParameter(WebSocketHttpExchange exchange, String... parameterNames) {
+        Map<String, List<String>> parameters = exchange.getRequestParameters();
+        for(String parameterName : parameterNames) {
+            List<String> values = parameters.get(parameterName);
+            if(values == null) {
+                continue;
+            }
+            for(String value : values) {
+                if(value != null && !value.isBlank()) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isRouterParameter(String parameterName) {
+        return "protocol".equals(parameterName)
+                || "service_id".equals(parameterName)
+                || "serviceId".equals(parameterName)
+                || "env_tag".equals(parameterName)
+                || "envTag".equals(parameterName);
     }
 
     private CompletableFuture<WebSocket> startDownstreamConnection(String wsURL, WebSocketHttpExchange exchange, String pairId, WebSocketChannel upstreamChannel) {
