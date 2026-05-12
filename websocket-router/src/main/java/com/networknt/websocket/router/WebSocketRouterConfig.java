@@ -4,6 +4,7 @@ import com.networknt.cluster.DiscoverableHost;
 import com.networknt.config.Config;
 import com.networknt.config.schema.BooleanField;
 import com.networknt.config.schema.ConfigSchema;
+import com.networknt.config.schema.IntegerField;
 import com.networknt.config.schema.MapField;
 import com.networknt.config.schema.OutputFormat;
 import com.networknt.config.schema.StringField;
@@ -32,6 +33,8 @@ public class WebSocketRouterConfig {
     public static final String CONFIG_NAME = "websocket-router";
     public static final String DEFAULT_PROTOCOL = "defaultProtocol";
     public static final String DEFAULT_ENV_TAG = "defaultEnvTag";
+    public static final String IDLE_TIMEOUT_MS = "idleTimeoutMs";
+    public static final int DEFAULT_IDLE_TIMEOUT_MS = 3600000;
     private static final String PATH_PREFIX_SERVICE = "pathPrefixService";
 
     @BooleanField(
@@ -56,6 +59,15 @@ public class WebSocketRouterConfig {
             description = "Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc."
     )
     String defaultEnvTag;
+
+    @IntegerField(
+            configFieldName = IDLE_TIMEOUT_MS,
+            externalizedKeyName = IDLE_TIMEOUT_MS,
+            description = "Idle timeout in milliseconds for WebSocket connections.",
+            defaultValue = "3600000",
+            min = 1
+    )
+    int idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
 
     @MapField(
             configFieldName = PATH_PREFIX_SERVICE,
@@ -117,6 +129,10 @@ public class WebSocketRouterConfig {
         return defaultEnvTag;
     }
 
+    public int getIdleTimeoutMs() {
+        return idleTimeoutMs;
+    }
+
     private void setConfigData() {
         if (mappedConfig != null) {
             Object object = mappedConfig.get("enabled");
@@ -125,6 +141,8 @@ public class WebSocketRouterConfig {
             if(object != null) defaultProtocol = (String)object;
             object = mappedConfig.get(DEFAULT_ENV_TAG);
             if(object != null) defaultEnvTag = (String)object;
+            object = mappedConfig.get(IDLE_TIMEOUT_MS);
+            if(object != null) idleTimeoutMs = Config.loadIntegerValue(IDLE_TIMEOUT_MS, object);
         }
         setPathPrefixService();
     }

@@ -60,6 +60,8 @@ public class WebSocketRouterHandler implements MiddlewareHandler {
 
         // build ws handshake connection callback
         wsHandshakeCallback = (exchange, channel) -> {
+            channel.setIdleTimeout(config.getIdleTimeoutMs());
+
             // get service details
             DiscoverableHost downstreamService = getDownstreamService(exchange);
             if(downstreamService == null) {

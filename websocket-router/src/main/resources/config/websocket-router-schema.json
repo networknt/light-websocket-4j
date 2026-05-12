@@ -1,7 +1,7 @@
 {
   "$schema" : "http://json-schema.org/draft-07/schema#",
   "type" : "object",
-  "required" : [ "enabled", "defaultProtocol", "defaultEnvTag", "pathPrefixService" ],
+  "required" : [ "enabled", "defaultProtocol", "defaultEnvTag", "idleTimeoutMs", "pathPrefixService" ],
   "properties" : {
     "enabled" : {
       "type" : "boolean",
@@ -16,6 +16,12 @@
     "defaultEnvTag" : {
       "type" : "string",
       "description" : "Default downstream envTag when not specified in the request. Like dev/sit/stg/prd etc."
+    },
+    "idleTimeoutMs" : {
+      "type" : "integer",
+      "description" : "Idle timeout in milliseconds for WebSocket connections.",
+      "default" : 3600000,
+      "minimum" : 1
     },
     "pathPrefixService" : {
       "type" : "object",

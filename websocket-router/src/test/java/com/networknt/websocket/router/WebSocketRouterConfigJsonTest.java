@@ -20,6 +20,7 @@ public class WebSocketRouterConfigJsonTest {
         Assertions.assertTrue(config.isEnabled());
         Assertions.assertEquals("http", config.getDefaultProtocol());
         Assertions.assertNull(config.getDefaultEnvTag());
+        Assertions.assertEquals(120000, config.getIdleTimeoutMs());
 
         Map<String, DiscoverableHost> pathPrefixServiceMap = config.getPathPrefixService();
         Assertions.assertNotNull(pathPrefixServiceMap);
@@ -30,4 +31,3 @@ public class WebSocketRouterConfigJsonTest {
         Assertions.assertEquals("dev", discoverableHost.envTag());
     }
 }
-

@@ -19,6 +19,7 @@ public class WebSocketRouterConfigStringTest {
         Assertions.assertTrue(config.isEnabled());
         Assertions.assertEquals("http", config.getDefaultProtocol());
         Assertions.assertNull(config.getDefaultEnvTag());
+        Assertions.assertEquals(WebSocketRouterConfig.DEFAULT_IDLE_TIMEOUT_MS, config.getIdleTimeoutMs());
 
         Map<String, DiscoverableHost> pathPrefixServiceMap = config.getPathPrefixService();
         Assertions.assertNotNull(pathPrefixServiceMap);
