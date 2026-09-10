@@ -50,7 +50,7 @@ public class WebSocketHandlerConfig {
     }
 
     private WebSocketHandlerConfig(String configName) {
-        mappedConfig = Config.getInstance().getJsonMapConfigNoCache(configName);
+        mappedConfig = Config.getInstance().getJsonMapConfig(configName);
         setConfigData();
     }
 
@@ -59,6 +59,9 @@ public class WebSocketHandlerConfig {
     }
 
     public static WebSocketHandlerConfig load(String configName) {
+        if (!CONFIG_NAME.equals(configName)) {
+            return new WebSocketHandlerConfig(configName);
+        }
         WebSocketHandlerConfig config = instance;
         if (config == null || config.getMappedConfig() != Config.getInstance().getJsonMapConfig(configName)) {
             synchronized (WebSocketHandlerConfig.class) {

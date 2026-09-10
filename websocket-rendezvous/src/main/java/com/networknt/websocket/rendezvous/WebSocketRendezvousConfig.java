@@ -50,7 +50,7 @@ public class WebSocketRendezvousConfig {
     }
 
     private WebSocketRendezvousConfig(String configName) {
-        mappedConfig = Config.getInstance().getJsonMapConfigNoCache(configName);
+        mappedConfig = Config.getInstance().getJsonMapConfig(configName);
         setConfigData();
     }
 
@@ -59,6 +59,9 @@ public class WebSocketRendezvousConfig {
     }
 
     public static WebSocketRendezvousConfig load(String configName) {
+        if (!CONFIG_NAME.equals(configName)) {
+            return new WebSocketRendezvousConfig(configName);
+        }
         WebSocketRendezvousConfig config = instance;
         if (config == null || config.getMappedConfig() != Config.getInstance().getJsonMapConfig(configName)) {
             synchronized (WebSocketRendezvousConfig.class) {

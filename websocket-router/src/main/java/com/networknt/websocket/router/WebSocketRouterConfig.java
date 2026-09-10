@@ -85,7 +85,7 @@ public class WebSocketRouterConfig {
     }
 
     private WebSocketRouterConfig(String configName) {
-        mappedConfig = Config.getInstance().getJsonMapConfigNoCache(configName);
+        mappedConfig = Config.getInstance().getJsonMapConfig(configName);
         setConfigData();
     }
 
@@ -94,6 +94,9 @@ public class WebSocketRouterConfig {
     }
 
     public static WebSocketRouterConfig load(String configName) {
+        if (!CONFIG_NAME.equals(configName)) {
+            return new WebSocketRouterConfig(configName);
+        }
         WebSocketRouterConfig config = instance;
         if (config == null || config.getMappedConfig() != Config.getInstance().getJsonMapConfig(configName)) {
             synchronized (WebSocketRouterConfig.class) {
