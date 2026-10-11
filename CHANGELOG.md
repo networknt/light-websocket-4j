@@ -1,5 +1,17 @@
 # Change Log
 
+## [2.4.1](https://github.com/networknt/light-websocket-4j/tree/2.4.1) (2026-10-11)
+
+**Commits:**
+
+- upgrade to version 2.4.1 before release in master branch ([81068bc](https://github.com/networknt/light-websocket-4j/commit/81068bcc5b1185e671cf595023856afc3209d025)) (by Steve Hu)
+- upgrade maven-gpg to 3.2.8 from 3.2.7 ([5a37253](https://github.com/networknt/light-websocket-4j/commit/5a37253e456e6e27b47e5f5f739c513ddf0a97e6)) (by Steve Hu)
+- build: upgrade JUnit to 6.1.3 ([0b3fe12](https://github.com/networknt/light-websocket-4j/commit/0b3fe128f3ed0a8484b0177736fc3e3b41e4f83f)) (by Steve Hu)
+- upgrade commons-codec from 1.18.0 to 1.22.1 ([52536ec](https://github.com/networknt/light-websocket-4j/commit/52536ec4c8b7bba43cde8bf41df123ac0e3578b3)) (by Steve Hu)
+- upgrade udertow to 2.4.4.Final from 2.4.1.Final ([00d90c7](https://github.com/networknt/light-websocket-4j/commit/00d90c7509118939a3bf93bf360ed007c30f6c2a)) (by Steve Hu)
+- upgrade logback to 1.6.5 from 1.6.3 ([77a5d0c](https://github.com/networknt/light-websocket-4j/commit/77a5d0c3b484b8fc3c316f372aecd38136ca52c7)) (by Steve Hu)
+- upgrade to version 2.4.1-SNAPSHOT after release in master branch ([e2af0bf](https://github.com/networknt/light-websocket-4j/commit/e2af0bfe3c0b1cfe61c224e567ae3d5f85ad97ee)) (by Steve Hu)
+
 ## [2.4.0](https://github.com/networknt/light-websocket-4j/tree/2.4.0) (2026-10-07)
 
 **Commits:**
