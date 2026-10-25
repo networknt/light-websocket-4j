@@ -11,8 +11,8 @@ import com.networknt.config.schema.StringField;
 import com.networknt.server.ModuleRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -164,8 +164,8 @@ public class WebSocketRouterConfig {
                     try {
                         Map<?, ?> parsed = Config.getInstance().getMapper().readValue(s, Map.class);
                         pathPrefixService = normalizePathPrefixService(parsed);
-                    } catch (IOException e) {
-                        logger.error("IOException:", e);
+                    } catch (JacksonException e) {
+                        logger.error("Unable to read configuration:", e);
                     }
                 } else {
                     Map<String, DiscoverableHost> map = new LinkedHashMap<>();
