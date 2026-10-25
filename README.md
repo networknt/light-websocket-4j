@@ -14,3 +14,11 @@ JacksonException where their JSON parsing previously threw IOException.
 Malformed pathPrefixService/pathPrefixHandlers JSON retains the handled empty
 map fallback; valid routing maps and reload identity behavior are unchanged.
 Other IOException handlers continue to handle actual socket/channel I/O.
+
+The source-build workflow resolves yaml-rule #36 and light-4j #2815 to their
+latest heads while open, then follows their base branches after merge. Other
+prerequisites use master. Each run logs the exact source commits tested and uses
+a fresh Maven repository. Rerun this check after prerequisite changes and before
+merging: an earlier green run qualifies only its recorded commits. Manual
+workflow dispatch is available. Source-build success does not qualify published
+artifact resolution.
