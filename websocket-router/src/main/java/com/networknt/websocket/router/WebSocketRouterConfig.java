@@ -165,7 +165,7 @@ public class WebSocketRouterConfig {
                         Map<?, ?> parsed = Config.getInstance().getMapper().readValue(s, Map.class);
                         pathPrefixService = normalizePathPrefixService(parsed);
                     } catch (JacksonException e) {
-                        logger.error("IOException:", e);
+                        logger.error("Unable to read configuration:", e);
                     }
                 } else {
                     Map<String, DiscoverableHost> map = new LinkedHashMap<>();

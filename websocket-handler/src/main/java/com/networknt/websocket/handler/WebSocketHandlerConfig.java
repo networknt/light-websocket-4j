@@ -106,7 +106,7 @@ public class WebSocketHandlerConfig {
                     try {
                         pathPrefixHandlers = Config.getInstance().getMapper().readValue(s, Map.class);
                     } catch (JacksonException e) {
-                        logger.error("IOException:", e);
+                        logger.error("Unable to read configuration:", e);
                     }
                 } else {
                     Map<String, String> map = new LinkedHashMap<>();
