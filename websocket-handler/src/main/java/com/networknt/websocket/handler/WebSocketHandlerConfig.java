@@ -8,8 +8,8 @@ import com.networknt.config.schema.OutputFormat;
 import com.networknt.server.ModuleRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -105,7 +105,7 @@ public class WebSocketHandlerConfig {
                 if (s.startsWith("{")) {
                     try {
                         pathPrefixHandlers = Config.getInstance().getMapper().readValue(s, Map.class);
-                    } catch (IOException e) {
+                    } catch (JacksonException e) {
                         logger.error("IOException:", e);
                     }
                 } else {
