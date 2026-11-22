@@ -1,5 +1,16 @@
 # Change Log
 
+## [2.5.1](https://github.com/networknt/light-websocket-4j/tree/2.5.1) (2026-11-21)
+
+**Commits:**
+
+- upgrade to version 2.5.1 before release in 2.x branch ([91a84f4](https://github.com/networknt/light-websocket-4j/commit/91a84f47d4a60d9c8ba966c640a07e76d7d7522c)) (by Steve Hu)
+- upgrade logback to 1.6.8 from 1.6.7 ([67a55b9](https://github.com/networknt/light-websocket-4j/commit/67a55b94031b556000cd6a57634d55f3dace095e)) (by Steve Hu)
+- upgrade logback to 1.6.7 from 1.6.6 ([ebdf35a](https://github.com/networknt/light-websocket-4j/commit/ebdf35acfcfc9b26b8c3d108773590e1542a70f0)) (by Steve Hu)
+- upgrade maven-version to 2.25.2 from 2.23.0 ([dabdca1](https://github.com/networknt/light-websocket-4j/commit/dabdca1f4a0aed80146335edeee7cb4d95d1340e)) (by Steve Hu)
+- upgrade maven-surefire to 3.6.1 from 3.6.0 ([8b010a9](https://github.com/networknt/light-websocket-4j/commit/8b010a9a61442f46b36a2dbf87c103b9fde7e6d0)) (by Steve Hu)
+- upgrade to version 2.5.1-SNAPSHOT after release in 2.x branch ([35173ab](https://github.com/networknt/light-websocket-4j/commit/35173ab15058dea9df18f67c5fde69eb9a5e686a)) (by Steve Hu)
+
 ## [2.5.0](https://github.com/networknt/light-websocket-4j/tree/2.5.0) (2026-11-04)
 
 **Commits:**
